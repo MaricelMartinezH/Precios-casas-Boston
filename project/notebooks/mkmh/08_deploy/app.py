@@ -8,17 +8,18 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from joblib import load
+from typing import Tuple
 
 
 @st.cache_resource
-def load_model_and_reference(model_path, split_path):
+def load_model_and_reference(model_path: str, split_path: str) -> Tuple:
     model = load(model_path)
     split_data = load(split_path)
     x_train = split_data["x_train"]
     return model, x_train
 
 
-def build_input_widgets(x_train):
+def build_input_widgets(x_train: pd.DataFrame) -> pd.DataFrame:
     user_data = {}
     columns = list(x_train.columns)
     n_cols = 3
@@ -45,7 +46,7 @@ def build_input_widgets(x_train):
     return pd.DataFrame([user_data])
 
 
-def preprocess_batch_data(df, x_train):
+def preprocess_batch_data(df: pd.DataFrame, x_train: pd.DataFrame) -> pd.DataFrame:
     """Preprocesa el CSV subido por el usuario para que coincida con el formato
     y tipos de dato esperados por el pipeline, usando x_train como referencia
     de columnas numericas, columnas categoricas y categorias validas.
@@ -78,7 +79,7 @@ def preprocess_batch_data(df, x_train):
     return processed_df
 
 
-def individual_prediction_tab(model, x_train):
+def individual_prediction_tab(model, x_train: pd.DataFrame) -> None:
     st.subheader("Ingresa las caracteristicas de la vivienda")
     df_user_data = build_input_widgets(x_train)
 
@@ -91,7 +92,7 @@ def individual_prediction_tab(model, x_train):
         )
 
 
-def batch_prediction_tab(model, x_train):
+def batch_prediction_tab(model, x_train: pd.DataFrame) -> None:
     st.subheader("Sube un archivo CSV con varias viviendas")
     uploaded_file = st.file_uploader("Elige un archivo CSV", type="csv")
 
@@ -141,7 +142,7 @@ def batch_prediction_tab(model, x_train):
         st.dataframe(x_train.head(3))
 
 
-def main():
+def main() -> None:
     st.set_page_config(page_title="Precios de Vivienda - Boston Housing", page_icon="🏠")
 
     project_root = Path(__file__).resolve().parents[3]
