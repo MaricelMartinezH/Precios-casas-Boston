@@ -41,9 +41,7 @@ def build_input_widgets(x_train):
                 )
             else:
                 options = sorted(series.dropna().unique().tolist())
-                user_data[column] = st.selectbox(
-                    label=column, options=options, index=0
-                )
+                user_data[column] = st.selectbox(label=column, options=options, index=0)
     return pd.DataFrame([user_data])
 
 
@@ -74,7 +72,7 @@ def preprocess_batch_data(df, x_train):
             valid_categories = x_train[column].dropna().unique().tolist()
             category_map = {str(cat).strip().lower(): cat for cat in valid_categories}
             processed_df[column] = processed_df[column].map(
-                lambda x: category_map.get(str(x).strip().lower(), x)
+                lambda x, cm=category_map: cm.get(str(x).strip().lower(), x)
             )
 
     return processed_df
@@ -109,9 +107,7 @@ def batch_prediction_tab(model, x_train):
             missing_cols = [col for col in required_cols if col not in df.columns]
 
             if missing_cols:
-                st.warning(
-                    "Advertencia: faltan estas columnas: " + ", ".join(missing_cols)
-                )
+                st.warning("Advertencia: faltan estas columnas: " + ", ".join(missing_cols))
                 st.info("Columnas requeridas: " + ", ".join(required_cols))
             elif st.button("Predecir precios"):
                 with st.spinner("Calculando predicciones..."):
