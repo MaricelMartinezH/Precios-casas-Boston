@@ -1,6 +1,6 @@
 from pathlib import Path
 
-APP_CODE = """# Streamlit demo del modelo de precios de vivienda (Boston Housing)
+APP_CODE = '''# Streamlit demo del modelo de precios de vivienda (Boston Housing)
 # Issue 8 - Notebook 10 - Proyecto Precios-casas-Boston
 #
 # Como ejecutar:
@@ -174,7 +174,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-"""
+'''
 
 output_dir = Path("project/notebooks/mkmh/08_deploy")
 output_dir.mkdir(parents=True, exist_ok=True)
