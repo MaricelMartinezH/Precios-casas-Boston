@@ -1,10 +1,11 @@
-# Streamlit demo del modelo de precios de vivienda (Boston Housing)
+from pathlib import Path
+
+APP_CODE = """# Streamlit demo del modelo de precios de vivienda (Boston Housing)
 # Issue 8 - Notebook 10 - Proyecto Precios-casas-Boston
 #
 # Como ejecutar:
 #   streamlit run project/notebooks/mkmh/08_deploy/app.py
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -12,14 +13,14 @@ from joblib import load
 
 
 @st.cache_resource
-def load_model_and_reference(model_path: str, split_path: str) -> tuple:
+def load_model_and_reference(model_path, split_path):
     model = load(model_path)
     split_data = load(split_path)
     x_train = split_data["x_train"]
     return model, x_train
 
 
-def build_input_widgets(x_train: pd.DataFrame) -> pd.DataFrame:
+def build_input_widgets(x_train):
     user_data = {}
     columns = list(x_train.columns)
     n_cols = 3
@@ -42,12 +43,15 @@ def build_input_widgets(x_train: pd.DataFrame) -> pd.DataFrame:
                 )
             else:
                 options = sorted(series.dropna().unique().tolist())
-                user_data[column] = st.selectbox(label=column, options=options, index=0)
+                user_data[column] = st.selectbox(
+                    label=column, options=options, index=0
+                )
     return pd.DataFrame([user_data])
 
 
-def preprocess_batch_data(df: pd.DataFrame, x_train: pd.DataFrame) -> pd.DataFrame:
-    """Preprocesa el CSV subido por el usuario para que coincida con el formato
+def preprocess_batch_data(df, x_train):
+    """
+    Preprocesa el CSV subido por el usuario para que coincida con el formato
     y tipos de dato esperados por el pipeline, usando x_train como referencia
     de columnas numericas, columnas categoricas y categorias validas.
 
@@ -69,17 +73,17 @@ def preprocess_batch_data(df: pd.DataFrame, x_train: pd.DataFrame) -> pd.DataFra
             processed_df[column] = pd.to_numeric(processed_df[column], errors="coerce")
         else:
             # normaliza texto (espacios, mayusculas/minusculas) contra las
-            # categorias vistas en entrenamiento, ej: " Male ", "MALE" -> "Male"
+            # categorias vistas en entrenamiento, ej: " Male " -> "Male"
             valid_categories = x_train[column].dropna().unique().tolist()
             category_map = {str(cat).strip().lower(): cat for cat in valid_categories}
             processed_df[column] = processed_df[column].map(
-                lambda x, cm=category_map: cm.get(str(x).strip().lower(), x)
+                lambda x: category_map.get(str(x).strip().lower(), x)
             )
 
     return processed_df
 
 
-def individual_prediction_tab(model: Any, x_train: pd.DataFrame) -> None:
+def individual_prediction_tab(model, x_train):
     st.subheader("Ingresa las caracteristicas de la vivienda")
     df_user_data = build_input_widgets(x_train)
 
@@ -92,7 +96,7 @@ def individual_prediction_tab(model: Any, x_train: pd.DataFrame) -> None:
         )
 
 
-def batch_prediction_tab(model: Any, x_train: pd.DataFrame) -> None:
+def batch_prediction_tab(model, x_train):
     st.subheader("Sube un archivo CSV con varias viviendas")
     uploaded_file = st.file_uploader("Elige un archivo CSV", type="csv")
 
@@ -108,7 +112,9 @@ def batch_prediction_tab(model: Any, x_train: pd.DataFrame) -> None:
             missing_cols = [col for col in required_cols if col not in df.columns]
 
             if missing_cols:
-                st.warning("Advertencia: faltan estas columnas: " + ", ".join(missing_cols))
+                st.warning(
+                    "Advertencia: faltan estas columnas: " + ", ".join(missing_cols)
+                )
                 st.info("Columnas requeridas: " + ", ".join(required_cols))
             elif st.button("Predecir precios"):
                 with st.spinner("Calculando predicciones..."):
@@ -142,7 +148,7 @@ def batch_prediction_tab(model: Any, x_train: pd.DataFrame) -> None:
         st.dataframe(x_train.head(3))
 
 
-def main() -> None:
+def main():
     st.set_page_config(page_title="Precios de Vivienda - Boston Housing", page_icon="🏠")
 
     project_root = Path(__file__).resolve().parents[3]
@@ -168,3 +174,11 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+"""
+
+output_dir = Path("project/notebooks/mkmh/08_deploy")
+output_dir.mkdir(parents=True, exist_ok=True)
+app_path = output_dir / "app.py"
+app_path.write_text(APP_CODE.strip() + "\n", encoding="utf-8")
+
+print(f"App de Streamlit guardada en: {app_path}")
