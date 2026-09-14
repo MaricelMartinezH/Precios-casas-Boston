@@ -113,7 +113,7 @@ class InferenceDataError(ValueError):
     """
 
 
-def load_model(model_path: Path = MODEL_PATH):
+def load_model(model_path: Path = MODEL_PATH) -> object:
     """Carga el modelo YA entrenado por `train_pipeline.py` (Issue 3).
 
     No entrena nada aquí: solo deserializa el `.joblib` guardado por
@@ -168,10 +168,7 @@ def load_new_data(
     elif suffix == ".parquet":
         new_data = pd.read_parquet(input_path, engine="pyarrow")
     else:
-        msg = (
-            f"Formato de archivo no soportado: '{suffix}'. Usa un archivo "
-            "'.csv' o '.parquet'."
-        )
+        msg = f"Formato de archivo no soportado: '{suffix}'. Usa un archivo '.csv' o '.parquet'."
         raise InferenceDataError(msg)
 
     if new_data.empty:
@@ -230,9 +227,7 @@ def transform_data(
 
     feature_names = preprocessor.get_feature_names_out()
     transformed = preprocessor.transform(features)
-    x_transformed = pd.DataFrame(
-        transformed, columns=feature_names, index=features.index
-    )
+    x_transformed = pd.DataFrame(transformed, columns=feature_names, index=features.index)
 
     # Misma columna de fuga de datos que excluye `train_pipeline.py`
     # antes de entrenar/predecir.
@@ -240,7 +235,7 @@ def transform_data(
     return x_model
 
 
-def generate_predictions(model, x_model: pd.DataFrame) -> np.ndarray:
+def generate_predictions(model: object, x_model: pd.DataFrame) -> np.ndarray:
     """Genera las predicciones con el modelo ya entrenado.
 
     Reutiliza `train_pipeline.predict`, la misma función que usa el
@@ -281,9 +276,7 @@ def build_predictions_output(
     return output
 
 
-def save_predictions(
-    predictions_df: pd.DataFrame, output_path: Path = PREDICTIONS_PATH
-) -> Path:
+def save_predictions(predictions_df: pd.DataFrame, output_path: Path = PREDICTIONS_PATH) -> Path:
     """Guarda las predicciones en un archivo `.csv` dentro de `data/predictions/`."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

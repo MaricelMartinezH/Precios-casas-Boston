@@ -281,9 +281,7 @@ def test_transform_data_matches_preprocessor_transform_without_refitting(
     # Mismo número de filas que la entrada, mismas columnas que usa el
     # modelo (leakage ya excluido) y sin nulos.
     assert len(x_model) == len(new_data_without_target_df)
-    assert (
-        list(x_model.columns) == fitted_preprocessor_and_model["expected_feature_names"]
-    )
+    assert list(x_model.columns) == fitted_preprocessor_and_model["expected_feature_names"]
     assert x_model.isna().sum().sum() == 0
     assert "binary__medv_censored" not in x_model.columns
 
@@ -400,9 +398,7 @@ def test_plot_predictions_creates_file_with_target(tmp_path: Path) -> None:
 
 
 def test_plot_predictions_creates_file_without_target(tmp_path: Path) -> None:
-    predictions_df = pd.DataFrame(
-        {"ID": [1, 2, 3], "medv_predicho": [21.0, 24.0, 29.5]}
-    )
+    predictions_df = pd.DataFrame({"ID": [1, 2, 3], "medv_predicho": [21.0, 24.0, 29.5]})
     plot_path = tmp_path / "plots" / "grafico.png"
 
     saved_path = ip.plot_predictions(predictions_df, plot_path)
@@ -461,10 +457,7 @@ def test_run_inference_pipeline_end_to_end_without_target(
     )
 
     assert results["n_records"] == len(new_data_without_target_df)
-    assert (
-        results["features_used"]
-        == fitted_preprocessor_and_model["expected_feature_names"]
-    )
+    assert results["features_used"] == fitted_preprocessor_and_model["expected_feature_names"]
     assert output_path.exists()
     assert plot_path.exists()
     assert log_path.exists()

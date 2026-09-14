@@ -209,18 +209,14 @@ def drop_redundant_features(
     return df.drop(columns=columns_to_drop)
 
 
-def add_rad_group_feature(
-    df: pd.DataFrame, high_value: int = RAD_HIGH_VALUE
-) -> pd.DataFrame:
+def add_rad_group_feature(df: pd.DataFrame, high_value: int = RAD_HIGH_VALUE) -> pd.DataFrame:
     """Crea el atributo derivado `rad_group` (Feature Engineering).
 
     Captura de forma explícita el grupo `rad = 24`, que se comporta de
     forma distinta al resto según el análisis bivariable/multivariable.
     """
     df_engineered = df.copy()
-    df_engineered["rad_group"] = np.where(
-        df_engineered["rad"] == high_value, "alto", "bajo"
-    )
+    df_engineered["rad_group"] = np.where(df_engineered["rad"] == high_value, "alto", "bajo")
     return df_engineered
 
 
@@ -365,8 +361,7 @@ def validate_processed_features(
 
     if list(x_train.columns) != list(x_test.columns):
         errors.append(
-            "[formato] 'x_train' y 'x_test' no tienen las mismas columnas "
-            "tras la transformación."
+            "[formato] 'x_train' y 'x_test' no tienen las mismas columnas tras la transformación."
         )
 
     train_nulls = int(x_train.isna().sum().sum())
@@ -593,18 +588,12 @@ def run_feature_pipeline(
     x_train, x_test, y_train, y_test = split_train_test(boston_features)
 
     preprocessor = build_preprocessor()
-    x_train_transformed, x_test_transformed = fit_transform_features(
-        preprocessor, x_train, x_test
-    )
+    x_train_transformed, x_test_transformed = fit_transform_features(preprocessor, x_train, x_test)
 
     # Validar las features ya procesadas ANTES de persistirlas.
-    validate_processed_features(
-        x_train_transformed, x_test_transformed, y_train, y_test
-    )
+    validate_processed_features(x_train_transformed, x_test_transformed, y_train, y_test)
 
-    save_processed_features(
-        x_train_transformed, x_test_transformed, y_train, y_test, output_dir
-    )
+    save_processed_features(x_train_transformed, x_test_transformed, y_train, y_test, output_dir)
 
     # Persistir el preprocesador ya ajustado para que `inference_pipeline.py`
     # pueda reutilizarlo tal cual (ver docstring de `save_preprocessor`).

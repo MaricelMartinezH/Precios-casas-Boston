@@ -57,3 +57,13 @@ source = ["src/"]
 [tool.coverage.run]
 source = ["src"]
 omit = ["**/__init__.py"]
+
+[tool.ruff.lint]
+ignore = [
+    "C901",
+    "PLR0912",
+    "PLR0913",
+    "PLR0917",
+    "E402",
+    "PLC0415",
+]
