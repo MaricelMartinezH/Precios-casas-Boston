@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypedDict
 
 import joblib
 import numpy as np
@@ -193,9 +194,18 @@ def save_metrics(
         json.dump(metrics, metrics_file, indent=2, ensure_ascii=False)
 
 
+class TrainPipelineResult(TypedDict):
+    """Resultado tipado del training pipeline."""
+
+    model: GradientBoostingRegressor
+    train_metrics: dict[str, float]
+    test_metrics: dict[str, float]
+    metrics_payload: dict[str, object]
+
+
 def run_train_pipeline(
     paths: PipelinePaths,
-) -> dict[str, object]:
+) -> TrainPipelineResult:
     """Ejecuta el training pipeline completo: features procesadas -> modelo y métricas.
 
     Retorna un diccionario con el modelo entrenado y las métricas, útil

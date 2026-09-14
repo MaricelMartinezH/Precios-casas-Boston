@@ -61,12 +61,8 @@ def valid_split() -> dict[str, pd.DataFrame | pd.Series]:
         index=range(n_train, n_train + n_test),
     )
 
-    y_train = pd.Series(
-        20.0 + 3.0 * x_train["numeric__lstat"], name="medv", index=x_train.index
-    )
-    y_test = pd.Series(
-        20.0 + 3.0 * x_test["numeric__lstat"], name="medv", index=x_test.index
-    )
+    y_train = pd.Series(20.0 + 3.0 * x_train["numeric__lstat"], name="medv", index=x_train.index)
+    y_test = pd.Series(20.0 + 3.0 * x_test["numeric__lstat"], name="medv", index=x_test.index)
 
     return {"x_train": x_train, "x_test": x_test, "y_train": y_train, "y_test": y_test}
 
@@ -91,9 +87,7 @@ def test_valid_split_passes_without_raising(
     assert result.failed_checks() == []
     # Se registran múltiples checks, no solo un booleano "passed".
     assert len(result.checks) > 5
-    assert any(
-        c.name == "overlap_indices" and c.status == "passed" for c in result.checks
-    )
+    assert any(c.name == "overlap_indices" and c.status == "passed" for c in result.checks)
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +131,7 @@ def test_duplicate_row_content_raises_leakage_error(
     )
 
     with pytest.raises(mvp.TrainTestSplitValidationError, match="duplicate_rows"):
-        mvp.validate_train_test_split(
-            x_train, x_test, y_train, y_test, target_col="medv"
-        )
+        mvp.validate_train_test_split(x_train, x_test, y_train, y_test, target_col="medv")
 
 
 def test_target_present_in_features_raises_leakage_error(
@@ -150,9 +142,7 @@ def test_target_present_in_features_raises_leakage_error(
     x_train["medv"] = valid_split["y_train"]
     x_test["medv"] = valid_split["y_test"]
 
-    with pytest.raises(
-        mvp.TrainTestSplitValidationError, match="target_not_in_features"
-    ):
+    with pytest.raises(mvp.TrainTestSplitValidationError, match="target_not_in_features"):
         mvp.validate_train_test_split(
             x_train,
             x_test,
@@ -210,8 +200,7 @@ def test_new_category_in_test_produces_warning(
 
     assert result.passed
     assert any(
-        c.name == "new_category_binary__chas" and c.status == "warning"
-        for c in result.checks
+        c.name == "new_category_binary__chas" and c.status == "warning" for c in result.checks
     )
 
 
@@ -303,9 +292,7 @@ def test_temporal_order_respected_passes(
     )
 
     assert result.passed
-    assert any(
-        c.name == "temporal_order" and c.status == "passed" for c in result.checks
-    )
+    assert any(c.name == "temporal_order" and c.status == "passed" for c in result.checks)
 
 
 # ---------------------------------------------------------------------------
@@ -391,8 +378,7 @@ def test_run_split_check_pipeline_writes_results_even_when_it_raises(
 
     x_train = valid_split["x_train"]
     x_test = valid_split["x_test"].copy()
-    x_test.index = [x_train.index[0]] + list(x_test.index[1:])  # fuerza fuga de datos
-
+    x_test.index = [x_train.index[0], *list(x_test.index[1:])]  # fuerza fuga de datos
     x_train.to_parquet(x_train_path, engine="pyarrow")
     x_test.to_parquet(x_test_path, engine="pyarrow")
     valid_split["y_train"].to_frame().to_parquet(y_train_path, engine="pyarrow")

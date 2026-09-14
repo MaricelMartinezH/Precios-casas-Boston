@@ -55,14 +55,17 @@ from __future__ import annotations
 
 import json
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypedDict, Unpack
 
 import joblib
 import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import KFold
 
 # Reutiliza las rutas y la función de lectura ya definidas en el Training
@@ -241,8 +244,7 @@ class TrainTestSplitValidationResult:
             "passed": self.passed,
             "has_warnings": self.has_warnings,
             "checks": [
-                {"name": c.name, "status": c.status, "message": c.message}
-                for c in self.checks
+                {"name": c.name, "status": c.status, "message": c.message} for c in self.checks
             ],
         }
 
@@ -287,9 +289,7 @@ def _check_duplicate_rows(
     práctica, la misma observación duplicada entre los dos conjuntos.
     """
     columnas_clave = (
-        id_columns
-        if id_columns
-        else [col for col in x_train.columns if col in x_test.columns]
+        id_columns if id_columns else [col for col in x_train.columns if col in x_test.columns]
     )
     if not columnas_clave:
         return CheckResult(
@@ -388,8 +388,7 @@ def _check_target_presence(
             CheckResult(
                 "target_no_nulls",
                 "failed",
-                f"El target tiene valores nulos: {train_nulls} en train, "
-                f"{test_nulls} en test.",
+                f"El target tiene valores nulos: {train_nulls} en train, {test_nulls} en test.",
             )
         )
     else:
@@ -404,7 +403,7 @@ def _check_target_presence(
     return checks
 
 
-def _check_sizes(
+def _check_sizes(  # noqa: PLR0913, PLR0917
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     min_train_size: int,
@@ -497,10 +496,7 @@ def _infer_column_groups(
     categorical_cols: list[str] = []
     for col in df.columns:
         serie = df[col]
-        if (
-            pd.api.types.is_numeric_dtype(serie)
-            and serie.nunique(dropna=True) > max_binary_unique
-        ):
+        if pd.api.types.is_numeric_dtype(serie) and serie.nunique(dropna=True) > max_binary_unique:
             numeric_cols.append(col)
         else:
             categorical_cols.append(col)
@@ -527,7 +523,7 @@ def _check_numeric_drift(
             continue
         train_vals = x_train[col].dropna()
         test_vals = x_test[col].dropna()
-        if len(train_vals) < 2 or len(test_vals) < 2:
+        if len(train_vals) < 2 or len(test_vals) < 2:  # noqa: PLR2004
             continue
 
         statistic, _p_value = ks_2samp(train_vals, test_vals)
@@ -621,15 +617,13 @@ def _check_categorical_drift(
     return checks
 
 
-def _check_target_drift(
-    y_train: pd.Series, y_test: pd.Series, threshold: float
-) -> CheckResult:
+def _check_target_drift(y_train: pd.Series, y_test: pd.Series, threshold: float) -> CheckResult:
     """Check de distribución del target entre train y test (equivalente a
     "Label Drift"), usando Kolmogorov-Smirnov, ya que `medv` es continuo.
     """
     train_vals = pd.Series(y_train).dropna()
     test_vals = pd.Series(y_test).dropna()
-    if len(train_vals) < 2 or len(test_vals) < 2:
+    if len(train_vals) < 2 or len(test_vals) < 2:  # noqa: PLR2004
         return CheckResult(
             "label_drift",
             "passed",
@@ -706,7 +700,23 @@ def _check_temporal_order(
 # ---------------------------------------------------------------------------
 
 
-def validate_train_test_split(
+class ValidateTrainTestSplitKwargs(TypedDict, total=False):
+    """Parámetros opcionales para validar el train/test split."""
+
+    target_col: str
+    id_columns: list[str] | None
+    numeric_columns: list[str] | None
+    categorical_columns: list[str] | None
+    min_train_size: int
+    min_test_size: int
+    min_test_train_ratio: float
+    max_test_train_ratio: float
+    drift_warning_threshold: float
+    max_binary_unique: int
+    time_column: str | None
+
+
+def validate_train_test_split(  # noqa: PLR0913
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     y_train: pd.Series,
@@ -781,13 +791,9 @@ def validate_train_test_split(
     numeric_cols, categorical_cols = _infer_column_groups(
         x_train, numeric_columns, categorical_columns, max_binary_unique
     )
+    checks.extend(_check_numeric_drift(x_train, x_test, numeric_cols, drift_warning_threshold))
     checks.extend(
-        _check_numeric_drift(x_train, x_test, numeric_cols, drift_warning_threshold)
-    )
-    checks.extend(
-        _check_categorical_drift(
-            x_train, x_test, categorical_cols, drift_warning_threshold
-        )
+        _check_categorical_drift(x_train, x_test, categorical_cols, drift_warning_threshold)
     )
     checks.append(_check_target_drift(y_train, y_test, drift_warning_threshold))
 
@@ -817,7 +823,7 @@ def run_split_check_pipeline(
     y_train_path: Path = Y_TRAIN_PATH,
     y_test_path: Path = Y_TEST_PATH,
     results_path: Path = RESULTS_PATH,
-    **validate_kwargs: object,
+    **validate_kwargs: Unpack[ValidateTrainTestSplitKwargs],
 ) -> TrainTestSplitValidationResult:
     """Ejecuta el check completo: lee el split ya persistido y lo valida.
 
@@ -835,9 +841,7 @@ def run_split_check_pipeline(
     )
 
     try:
-        result = validate_train_test_split(
-            x_train, x_test, y_train, y_test, **validate_kwargs
-        )
+        result = validate_train_test_split(x_train, x_test, y_train, y_test, **validate_kwargs)
     except TrainTestSplitValidationError as exc:
         results_path.parent.mkdir(parents=True, exist_ok=True)
         payload = TrainTestSplitValidationResult(checks=exc.checks).to_dict()
@@ -901,7 +905,7 @@ def validate_model_with_cross_validation(
     x_train: pd.DataFrame,
     y_train: pd.Series,
     *,
-    model_builder=tp.build_model,
+    model_builder: Callable[[], GradientBoostingRegressor] = tp.build_model,
     n_splits: int = DEFAULT_CV_SPLITS,
     random_state: int = DEFAULT_CV_RANDOM_STATE,
 ) -> CrossValidationResult:
@@ -932,7 +936,7 @@ def validate_model_with_cross_validation(
     a 2, o si no hay suficientes filas en `x_train` para ese número de
     particiones.
     """
-    if n_splits < 2:
+    if n_splits < 2:  # noqa: PLR2004
         raise ValueError(
             f"n_splits debe ser al menos 2 para poder hacer cross-validation (se recibió {n_splits})."
         )
@@ -1037,17 +1041,25 @@ def diagnose_generalization(
     cv_r2 = comparison.cv_mean.get("R2")
     test_r2 = comparison.test.get("R2")
 
+    train_r2_value = float(train_r2) if train_r2 is not None else None
+    cv_r2_value = float(cv_r2) if cv_r2 is not None else None
+    test_r2_value = float(test_r2) if test_r2 is not None else None
+
     overfit_vs_cv = (
         train_r2 is not None
         and cv_r2 is not None
-        and train_r2 >= overfit_train_r2_min
-        and (train_r2 - cv_r2) > overfit_r2_gap
+        and train_r2_value is not None
+        and cv_r2_value is not None
+        and train_r2_value >= overfit_train_r2_min
+        and (train_r2_value - cv_r2_value) > overfit_r2_gap
     )
     overfit_vs_test = (
         train_r2 is not None
         and test_r2 is not None
-        and train_r2 >= overfit_train_r2_min
-        and (train_r2 - test_r2) > overfit_r2_gap
+        and train_r2_value is not None
+        and test_r2_value is not None
+        and train_r2_value >= overfit_train_r2_min
+        and (train_r2_value - test_r2_value) > overfit_r2_gap
     )
     underfitting = (
         train_r2 is not None
@@ -1056,12 +1068,15 @@ def diagnose_generalization(
     )
 
     if overfit_vs_cv:
+        assert train_r2_value is not None
+        assert cv_r2_value is not None
+        cv_r2_gap = train_r2_value - cv_r2_value
         checks.append(
             CheckResult(
                 "overfitting_train_vs_cv",
                 "warning",
-                f"R2 en train ({train_r2:.3f}) es notablemente más alto que en "
-                f"cross-validation ({cv_r2:.3f}); diferencia={train_r2 - cv_r2:.3f} "
+                f"R2 en train ({train_r2_value:.3f}) es notablemente más alto que en "
+                f"cross-validation ({cv_r2_value:.3f}); diferencia={cv_r2_gap:.3f} "
                 f"> {overfit_r2_gap}. Señal de posible sobreajuste.",
             )
         )
@@ -1076,12 +1091,15 @@ def diagnose_generalization(
         )
 
     if overfit_vs_test:
+        assert train_r2_value is not None
+        assert test_r2_value is not None
+        test_r2_gap = train_r2_value - test_r2_value
         checks.append(
             CheckResult(
                 "overfitting_train_vs_test",
                 "warning",
-                f"R2 en train ({train_r2:.3f}) es notablemente más alto que en "
-                f"test ({test_r2:.3f}); diferencia={train_r2 - test_r2:.3f} "
+                f"R2 en train ({train_r2_value:.3f}) es notablemente más alto que en "
+                f"test ({test_r2_value:.3f}); diferencia={test_r2_gap:.3f} "
                 f"> {overfit_r2_gap}. Señal de posible sobreajuste.",
             )
         )
@@ -1120,10 +1138,11 @@ def diagnose_generalization(
     if overfit_vs_cv or overfit_vs_test:
         actions.extend(
             [
-                ("aumentar la regularización (reducir `max_depth`, aumentar "
-                "`min_samples_leaf`)"),
-                ("reducir la complejidad del modelo (menos `n_estimators` o "
-                "`learning_rate` más bajo)"),
+                ("aumentar la regularización (reducir `max_depth`, aumentar `min_samples_leaf`)"),
+                (
+                    "reducir la complejidad del modelo (menos `n_estimators` o "
+                    "`learning_rate` más bajo)"
+                ),
                 "revisar/seleccionar variables predictoras",
                 "recolectar más datos de entrenamiento si es posible",
             ]
@@ -1131,12 +1150,12 @@ def diagnose_generalization(
     if underfitting:
         actions.extend(
             [
-                ("aumentar la complejidad del modelo (más `n_estimators`, mayor "
-                "`max_depth`)"),
-                ("revisar si faltan variables predictoras relevantes (feature "
-                "engineering adicional)"),
-                ("revisar la calidad de los datos de entrada (ruido, outliers "
-                "no tratados)"),
+                ("aumentar la complejidad del modelo (más `n_estimators`, mayor `max_depth`)"),
+                (
+                    "revisar si faltan variables predictoras relevantes (feature "
+                    "engineering adicional)"
+                ),
+                ("revisar la calidad de los datos de entrada (ruido, outliers no tratados)"),
             ]
         )
 
@@ -1145,8 +1164,7 @@ def diagnose_generalization(
         message = (
             f"Diagnóstico de generalización: R2 train={train_r2:.3f}, "
             f"R2 CV={cv_r2:.3f} (+/-{comparison.cv_std.get('R2', 0.0):.3f}), "
-            f"R2 test={test_r2:.3f}. Acciones de mejora sugeridas: "
-            + "; ".join(actions) + "."
+            f"R2 test={test_r2:.3f}. Acciones de mejora sugeridas: " + "; ".join(actions) + "."
         )
     else:
         status = "passed"
@@ -1201,8 +1219,7 @@ class ModelValidationResult:
             "test": self.test_metrics,
             "comparison": self.comparison.to_dict(),
             "diagnosis": [
-                {"name": c.name, "status": c.status, "message": c.message}
-                for c in self.diagnosis
+                {"name": c.name, "status": c.status, "message": c.message} for c in self.diagnosis
             ],
         }
 
@@ -1211,10 +1228,10 @@ def _plot_train_cv_test_comparison(result: ModelValidationResult, output_path: P
     """Genera una gráfica de barras comparando TRAIN/CV/TEST por métrica
     (evidencia visual del punto 8 de la Issue).
     """
-    import matplotlib
+    import matplotlib  # noqa: PLC0415
 
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt  # noqa: PLC0415
 
     metric_names = ["MAE", "RMSE", "R2", "MAPE"]
     x_positions = np.arange(len(metric_names))
@@ -1253,10 +1270,10 @@ def _plot_cv_scores_by_fold(
     """Genera una gráfica de la métrica principal por fold de
     cross-validation (evidencia visual de la variabilidad entre folds).
     """
-    import matplotlib
+    import matplotlib  # noqa: PLC0415
 
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt  # noqa: PLC0415
 
     fold_scores = cv_result.scores.get(metric, [])
     fold_numbers = np.arange(1, len(fold_scores) + 1)
@@ -1306,7 +1323,7 @@ def save_model_validation_evidence(
     _plot_cv_scores_by_fold(result.cv_result, cv_plot_path, metric=tp.MAIN_METRIC)
 
 
-def run_model_validation_pipeline(
+def run_model_validation_pipeline(  # noqa: PLR0913, PLR0917
     x_train_path: Path = X_TRAIN_PATH,
     x_test_path: Path = X_TEST_PATH,
     y_train_path: Path = Y_TRAIN_PATH,
