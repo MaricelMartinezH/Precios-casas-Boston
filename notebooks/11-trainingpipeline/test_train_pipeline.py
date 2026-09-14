@@ -16,14 +16,13 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
+import train_pipeline as tp
 from sklearn.ensemble import GradientBoostingRegressor
 
 TRAIN_ROWS = 20
 TEST_ROWS = 10
 SMALL_N_ESTIMATORS = 5
 MAX_EXPECTED_MAE = 5
-
-import train_pipeline as tp
 
 
 @pytest.fixture
@@ -72,12 +71,8 @@ def test_load_processed_features_reads_expected_shapes(
 
     small_features_df.iloc[:TRAIN_ROWS].to_parquet(x_train_path, engine="pyarrow")
     small_features_df.iloc[TRAIN_ROWS:].to_parquet(x_test_path, engine="pyarrow")
-    small_target_series.iloc[:TRAIN_ROWS].to_frame().to_parquet(
-        y_train_path, engine="pyarrow"
-    )
-    small_target_series.iloc[TRAIN_ROWS:].to_frame().to_parquet(
-        y_test_path, engine="pyarrow"
-    )
+    small_target_series.iloc[:TRAIN_ROWS].to_frame().to_parquet(y_train_path, engine="pyarrow")
+    small_target_series.iloc[TRAIN_ROWS:].to_frame().to_parquet(y_test_path, engine="pyarrow")
 
     x_train, x_test, y_train, y_test = tp.load_processed_features(
         x_train_path, x_test_path, y_train_path, y_test_path
@@ -96,9 +91,7 @@ def test_load_processed_features_raises_clear_error_when_file_missing(
     missing_path = tmp_path / "no_existe.parquet"
 
     with pytest.raises(FileNotFoundError, match="feature_pipeline_validado"):
-        tp.load_processed_features(
-            missing_path, missing_path, missing_path, missing_path
-        )
+        tp.load_processed_features(missing_path, missing_path, missing_path, missing_path)
 
 
 def test_drop_leakage_columns_removes_medv_censored(
@@ -110,9 +103,7 @@ def test_drop_leakage_columns_removes_medv_censored(
 
     assert "binary__medv_censored" not in result.columns
     # El resto de columnas se conserva intacto
-    assert set(result.columns) == set(small_features_df.columns) - {
-        "binary__medv_censored"
-    }
+    assert set(result.columns) == set(small_features_df.columns) - {"binary__medv_censored"}
     assert len(result) == len(small_features_df)
 
 
@@ -260,20 +251,18 @@ def test_run_train_pipeline_end_to_end(
 
     small_features_df.iloc[:TRAIN_ROWS].to_parquet(x_train_path, engine="pyarrow")
     small_features_df.iloc[TRAIN_ROWS:].to_parquet(x_test_path, engine="pyarrow")
-    small_target_series.iloc[:TRAIN_ROWS].to_frame().to_parquet(
-        y_train_path, engine="pyarrow"
-    )
-    small_target_series.iloc[TRAIN_ROWS:].to_frame().to_parquet(
-        y_test_path, engine="pyarrow"
-    )
+    small_target_series.iloc[:TRAIN_ROWS].to_frame().to_parquet(y_train_path, engine="pyarrow")
+    small_target_series.iloc[TRAIN_ROWS:].to_frame().to_parquet(y_test_path, engine="pyarrow")
 
     results = tp.run_train_pipeline(
-        x_train_path=x_train_path,
-        x_test_path=x_test_path,
-        y_train_path=y_train_path,
-        y_test_path=y_test_path,
-        model_path=model_path,
-        metrics_path=metrics_path,
+        paths=tp.PipelinePaths(
+            x_train=x_train_path,
+            x_test=x_test_path,
+            y_train=y_train_path,
+            y_test=y_test_path,
+            model=model_path,
+            metrics=metrics_path,
+        )
     )
 
     assert set(results.keys()) == {
@@ -286,7 +275,9 @@ def test_run_train_pipeline_end_to_end(
     assert metrics_path.exists()
 
     # El modelo no debe haber recibido la columna con fuga de datos
-    assert "binary__medv_censored" not in results["model"].feature_names_in_
+    model = results["model"]
+    assert isinstance(model, GradientBoostingRegressor)
+    assert "binary__medv_censored" not in model.feature_names_in_
 
     with metrics_path.open(encoding="utf-8") as metrics_file:
         saved_metrics = json.load(metrics_file)

@@ -28,6 +28,7 @@ Uso:
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import joblib
@@ -57,6 +58,21 @@ MODELS_DIR = DATA_DIR / "06_models"
 MODEL_OUTPUT_DIR = DATA_DIR / "07_model_output"
 MODEL_PATH = MODELS_DIR / "train_pipeline_model.joblib"
 METRICS_PATH = MODEL_OUTPUT_DIR / "train_pipeline_metrics.json"
+
+
+@dataclass(frozen=True)
+class PipelinePaths:
+    """Rutas de entrada y salida del training pipeline."""
+
+    x_train: Path = X_TRAIN_PATH
+    x_test: Path = X_TEST_PATH
+    y_train: Path = Y_TRAIN_PATH
+    y_test: Path = Y_TEST_PATH
+    model: Path = MODEL_PATH
+    metrics: Path = METRICS_PATH
+
+
+DEFAULT_PIPELINE_PATHS = PipelinePaths()
 
 TARGET_COL = "medv"
 
@@ -150,9 +166,7 @@ def predict(model: GradientBoostingRegressor, x: pd.DataFrame) -> np.ndarray:
     return model.predict(x)
 
 
-def compute_regression_metrics(
-    y_true: pd.Series, y_pred: np.ndarray
-) -> dict[str, float]:
+def compute_regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float]:
     """Calcula las mismas cuatro métricas de regresión usadas en el POC.
 
     MAE, RMSE, R2 y MAPE (notebooks 07 y 08), con RMSE como métrica
@@ -181,12 +195,7 @@ def save_metrics(metrics: dict, metrics_path: Path = METRICS_PATH) -> None:
 
 
 def run_train_pipeline(
-    x_train_path: Path = X_TRAIN_PATH,
-    x_test_path: Path = X_TEST_PATH,
-    y_train_path: Path = Y_TRAIN_PATH,
-    y_test_path: Path = Y_TEST_PATH,
-    model_path: Path = MODEL_PATH,
-    metrics_path: Path = METRICS_PATH,
+    paths: PipelinePaths = DEFAULT_PIPELINE_PATHS,
 ) -> dict[str, object]:
     """Ejecuta el training pipeline completo: features procesadas -> modelo y métricas.
 
@@ -194,7 +203,10 @@ def run_train_pipeline(
     tanto para pruebas unitarias como para inspección interactiva.
     """
     x_train, x_test, y_train, y_test = load_processed_features(
-        x_train_path, x_test_path, y_train_path, y_test_path
+        paths.x_train,
+        paths.x_test,
+        paths.y_train,
+        paths.y_test,
     )
 
     x_train_model = drop_leakage_columns(x_train)
@@ -209,7 +221,7 @@ def run_train_pipeline(
     train_metrics = compute_regression_metrics(y_train, y_train_pred)
     test_metrics = compute_regression_metrics(y_test, y_test_pred)
 
-    save_model(model, model_path)
+    save_model(model, paths.model)
 
     metrics_payload = {
         "model": MODEL_NAME,
@@ -223,7 +235,7 @@ def run_train_pipeline(
         "train": train_metrics,
         "test": test_metrics,
     }
-    save_metrics(metrics_payload, metrics_path)
+    save_metrics(metrics_payload, paths.metrics)
 
     return {
         "model": model,
