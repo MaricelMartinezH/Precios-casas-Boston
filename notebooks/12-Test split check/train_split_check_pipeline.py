@@ -155,8 +155,6 @@ class TrainTestSplitValidationError(Exception):
         self.checks: list[CheckResult] = checks or []
 
 
-@dataclass
-@dataclass(frozen=True)
 MIN_VALUES_FOR_DRIFT = 2
 
 
@@ -170,11 +168,12 @@ class TrainTestSplitConfig:
     min_test_size: int = DEFAULT_MIN_TEST_SIZE
     min_test_train_ratio: float = DEFAULT_MIN_TEST_TRAIN_RATIO
     max_test_train_ratio: float = DEFAULT_MAX_TEST_TRAIN_RATIO
-    config.drift_warning_threshold: float = DEFAULT_DRIFT_WARNING_THRESHOLD
+    drift_warning_threshold: float = DEFAULT_DRIFT_WARNING_THRESHOLD
     max_binary_unique: int = DEFAULT_MAX_BINARY_UNIQUE
     time_column: str | None = None
 
 
+@dataclass(frozen=True)
 class SizeCheckConfig:
     min_train_size: int
     min_test_size: int
@@ -182,6 +181,7 @@ class SizeCheckConfig:
     max_ratio: float
 
 
+@dataclass(frozen=True)
 class CheckResult:
     """Resultado individual de un check de validación del split.
 
@@ -414,7 +414,7 @@ def _check_sizes(
             CheckResult(
                 "min_train_size",
                 "passed",
-                f"train tiene {n_train} registro(s) (mínimo requerido: {min_train_size}).",
+                f"train tiene {n_train} registro(s) (mínimo requerido: {config.min_train_size}).",
             )
         )
 
@@ -432,7 +432,7 @@ def _check_sizes(
             CheckResult(
                 "min_test_size",
                 "passed",
-                f"test tiene {n_test} registro(s) (mínimo requerido: {min_test_size}).",
+                f"test tiene {n_test} registro(s) (mínimo requerido: {config.min_test_size}).",
             )
         )
 
@@ -685,6 +685,9 @@ def _check_temporal_order(
 # ---------------------------------------------------------------------------
 
 
+DEFAULT_SPLIT_CONFIG = TrainTestSplitConfig()
+
+
 def validate_train_test_split(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
@@ -751,7 +754,9 @@ def validate_train_test_split(
     numeric_cols, categorical_cols = _infer_column_groups(
         x_train, config.numeric_columns, config.categorical_columns, config.max_binary_unique
     )
-    checks.extend(_check_numeric_drift(x_train, x_test, numeric_cols, config.drift_warning_threshold))
+    checks.extend(
+        _check_numeric_drift(x_train, x_test, numeric_cols, config.drift_warning_threshold)
+    )
     checks.extend(
         _check_categorical_drift(x_train, x_test, categorical_cols, config.drift_warning_threshold)
     )
@@ -777,13 +782,13 @@ def validate_train_test_split(
     return result
 
 
-def run_split_check_pipeline(
+def run_split_check_pipeline(  # noqa: PLR0913, PLR0917
     x_train_path: Path = X_TRAIN_PATH,
     x_test_path: Path = X_TEST_PATH,
     y_train_path: Path = Y_TRAIN_PATH,
     y_test_path: Path = Y_TEST_PATH,
     results_path: Path = RESULTS_PATH,
-    config: TrainTestSplitConfig = TrainTestSplitConfig(),
+    config: TrainTestSplitConfig = DEFAULT_SPLIT_CONFIG,
 ) -> TrainTestSplitValidationResult:
     """Ejecuta el check completo: lee el split ya persistido y lo valida.
 

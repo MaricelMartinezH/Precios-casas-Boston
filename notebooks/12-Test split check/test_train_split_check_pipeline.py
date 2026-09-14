@@ -59,7 +59,6 @@ def valid_split() -> dict[str, pd.DataFrame | pd.Series]:
     return {"x_train": x_train, "x_test": x_test, "y_train": y_train, "y_test": y_test}
 
 
-
 DEFAULT_CONFIG = tsc.TrainTestSplitConfig(target_col="medv")
 SMALL_DATA_CONFIG = tsc.TrainTestSplitConfig(
     target_col="medv",

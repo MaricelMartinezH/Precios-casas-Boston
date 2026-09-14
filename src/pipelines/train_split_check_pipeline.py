@@ -686,6 +686,8 @@ def _check_temporal_order(
 
 
 DEFAULT_SPLIT_CONFIG = TrainTestSplitConfig()
+
+
 def validate_train_test_split(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
@@ -752,7 +754,9 @@ def validate_train_test_split(
     numeric_cols, categorical_cols = _infer_column_groups(
         x_train, config.numeric_columns, config.categorical_columns, config.max_binary_unique
     )
-    checks.extend(_check_numeric_drift(x_train, x_test, numeric_cols, config.drift_warning_threshold))
+    checks.extend(
+        _check_numeric_drift(x_train, x_test, numeric_cols, config.drift_warning_threshold)
+    )
     checks.extend(
         _check_categorical_drift(x_train, x_test, categorical_cols, config.drift_warning_threshold)
     )
@@ -778,7 +782,7 @@ def validate_train_test_split(
     return result
 
 
-def run_split_check_pipeline(
+def run_split_check_pipeline(  # noqa: PLR0913, PLR0917
     x_train_path: Path = X_TRAIN_PATH,
     x_test_path: Path = X_TEST_PATH,
     y_train_path: Path = Y_TRAIN_PATH,
