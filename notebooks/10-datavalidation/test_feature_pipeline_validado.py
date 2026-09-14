@@ -19,13 +19,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.compose import ColumnTransformer
 
 # Permite importar el pipeline ubicado en esta misma carpeta.
 PROJECT_ROOT = Path(__file__).resolve().parent
+MEDV_CENSORED_VALUE = 50.0
+RAD_HIGH_VALUE = 24
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import feature_pipeline_validado as fp
+import feature_pipeline_validado as fp  # noqa: E402
 
 
 @pytest.fixture
@@ -96,8 +99,8 @@ def test_flag_censored_target_marks_expected_rows(raw_boston_df: pd.DataFrame) -
 
     assert "medv_censored" in result.columns
     # Toda fila con medv == 50.0 debe quedar marcada con 1, el resto con 0
-    assert (result.loc[result["medv"] == 50.0, "medv_censored"] == 1).all()
-    assert (result.loc[result["medv"] != 50.0, "medv_censored"] == 0).all()
+    assert (result.loc[result["medv"] == MEDV_CENSORED_VALUE, "medv_censored"] == 1).all()
+    assert (result.loc[result["medv"] != MEDV_CENSORED_VALUE, "medv_censored"] == 0).all()
     assert set(result["medv_censored"].unique()).issubset({0, 1})
 
 
@@ -120,15 +123,13 @@ def test_add_rad_group_feature_creates_expected_categories(
 
     assert "rad_group" in result.columns
     assert set(result["rad_group"].unique()).issubset({"alto", "bajo"})
-    assert (result.loc[result["rad"] == 24, "rad_group"] == "alto").all()
-    assert (result.loc[result["rad"] != 24, "rad_group"] == "bajo").all()
+    assert (result.loc[result["rad"] == RAD_HIGH_VALUE, "rad_group"] == "alto").all()
+    assert (result.loc[result["rad"] != RAD_HIGH_VALUE, "rad_group"] == "bajo").all()
 
 
 def test_split_train_test_shapes_and_no_leakage(raw_boston_df: pd.DataFrame) -> None:
     prepared_df = fp.add_rad_group_feature(
-        fp.drop_redundant_features(
-            fp.flag_censored_target(fp.clean_data(raw_boston_df))
-        )
+        fp.drop_redundant_features(fp.flag_censored_target(fp.clean_data(raw_boston_df)))
     )
 
     x_train, x_test, y_train, y_test = fp.split_train_test(
@@ -146,8 +147,6 @@ def test_split_train_test_shapes_and_no_leakage(raw_boston_df: pd.DataFrame) -> 
 
 
 def test_build_preprocessor_returns_column_transformer() -> None:
-    from sklearn.compose import ColumnTransformer
-
     preprocessor = fp.build_preprocessor()
 
     assert isinstance(preprocessor, ColumnTransformer)
@@ -159,13 +158,9 @@ def test_fit_transform_features_produces_numeric_matrix_without_nulls(
     raw_boston_df: pd.DataFrame,
 ) -> None:
     prepared_df = fp.add_rad_group_feature(
-        fp.drop_redundant_features(
-            fp.flag_censored_target(fp.clean_data(raw_boston_df))
-        )
+        fp.drop_redundant_features(fp.flag_censored_target(fp.clean_data(raw_boston_df)))
     )
-    x_train, x_test, _, _ = fp.split_train_test(
-        prepared_df, test_size=0.5, random_state=42
-    )
+    x_train, x_test, _, _ = fp.split_train_test(prepared_df, test_size=0.5, random_state=42)
 
     preprocessor = fp.build_preprocessor()
     x_train_transformed, x_test_transformed = fp.fit_transform_features(
@@ -190,9 +185,7 @@ def test_save_processed_features_writes_expected_files(
     tmp_path: Path, raw_boston_df: pd.DataFrame
 ) -> None:
     prepared_df = fp.add_rad_group_feature(
-        fp.drop_redundant_features(
-            fp.flag_censored_target(fp.clean_data(raw_boston_df))
-        )
+        fp.drop_redundant_features(fp.flag_censored_target(fp.clean_data(raw_boston_df)))
     )
     x_train, x_test, y_train, y_test = fp.split_train_test(
         prepared_df, test_size=0.5, random_state=42
@@ -203,9 +196,7 @@ def test_save_processed_features_writes_expected_files(
     )
 
     output_dir = tmp_path / "03_primary"
-    fp.save_processed_features(
-        x_train_transformed, x_test_transformed, y_train, y_test, output_dir
-    )
+    fp.save_processed_features(x_train_transformed, x_test_transformed, y_train, y_test, output_dir)
 
     expected_files = {
         "x_train_features.parquet",
@@ -217,9 +208,7 @@ def test_save_processed_features_writes_expected_files(
     assert expected_files == created_files
 
 
-def test_run_feature_pipeline_end_to_end(
-    tmp_path: Path, raw_boston_df: pd.DataFrame
-) -> None:
+def test_run_feature_pipeline_end_to_end(tmp_path: Path, raw_boston_df: pd.DataFrame) -> None:
     """Prueba de integración: datos originales -> features procesadas guardadas."""
     input_path = tmp_path / "boston_type_fixed.parquet"
     raw_boston_df.to_parquet(input_path, engine="pyarrow")
@@ -308,9 +297,7 @@ def test_validate_input_data_fails_on_duplicate_rows(
     prepared_valid_df: pd.DataFrame,
 ) -> None:
     """Unicidad: no deberían quedar filas 100% duplicadas en esta etapa."""
-    invalid_df = pd.concat(
-        [prepared_valid_df, prepared_valid_df.iloc[[0]]], ignore_index=True
-    )
+    invalid_df = pd.concat([prepared_valid_df, prepared_valid_df.iloc[[0]]], ignore_index=True)
 
     with pytest.raises(fp.DataValidationError, match=r"\[unicidad\]"):
         fp.validate_input_data(invalid_df)
@@ -321,7 +308,7 @@ def test_validate_input_data_fails_on_rad_group_integrity_violation(
 ) -> None:
     """Integridad: 'rad_group' debe ser 'alto' únicamente cuando rad == 24."""
     invalid_df = prepared_valid_df.copy()
-    row_idx = invalid_df.index[invalid_df["rad"] == 24][0]
+    row_idx = invalid_df.index[invalid_df["rad"] == RAD_HIGH_VALUE][0]
     invalid_df.loc[row_idx, "rad_group"] = "bajo"  # inconsistente con rad == 24
 
     with pytest.raises(fp.DataValidationError, match=r"\[integridad\].*rad_group"):
@@ -333,7 +320,7 @@ def test_validate_input_data_fails_on_medv_censored_integrity_violation(
 ) -> None:
     """Integridad: 'medv_censored' debe ser 1 únicamente cuando medv == 50.0."""
     invalid_df = prepared_valid_df.copy()
-    row_idx = invalid_df.index[invalid_df["medv"] == 50.0][0]
+    row_idx = invalid_df.index[invalid_df["medv"] == MEDV_CENSORED_VALUE][0]
     invalid_df.loc[row_idx, "medv_censored"] = 0  # inconsistente con medv == 50.0
 
     with pytest.raises(fp.DataValidationError, match=r"\[integridad\].*medv_censored"):

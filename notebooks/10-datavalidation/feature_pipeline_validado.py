@@ -192,9 +192,7 @@ def drop_redundant_features(
     return df.drop(columns=columns_to_drop)
 
 
-def add_rad_group_feature(
-    df: pd.DataFrame, high_value: int = RAD_HIGH_VALUE
-) -> pd.DataFrame:
+def add_rad_group_feature(df: pd.DataFrame, high_value: int = RAD_HIGH_VALUE) -> pd.DataFrame:
     """Crea el atributo derivado `rad_group` (Feature Engineering).
 
     Captura de forma explícita el grupo `rad = 24`, que se comporta de
@@ -205,69 +203,67 @@ def add_rad_group_feature(
     return df_engineered
 
 
-def validate_input_data(
+def _validate_types(
     df: pd.DataFrame,
-    numeric_columns: list[str] = EXPECTED_NUMERIC_COLUMNS,
-    valid_ranges: dict[str, tuple[float, float]] = VALID_RANGES,
-    valid_categories: dict[str, set] = VALID_CATEGORIES,
-    max_null_fraction: float = MAX_NULL_FRACTION,
-) -> None:
-    """Valida calidad, consistencia, formato e integridad de los datos.
-
-    Se ejecuta sobre el DataFrame ya limpio y con los atributos derivados
-    (`medv_censored`, `rad_group`), justo antes de hacer el split y
-    transformar. Cubre:
-
-    1. Tipos esperados (columnas numéricas).
-    2. Rangos razonables (según lo documentado/derivado en los notebooks).
-    3. Porcentaje máximo de nulos por columna.
-    4. Categorías válidas (`chas`, `rad`, `rad_group`, `medv_censored`).
-    5. Fechas: no aplica; el dataset no tiene columnas de fecha.
-    6. Unicidad: ausencia de filas completamente duplicadas (no existe un
-       ID de negocio en esta etapa, ya fue eliminado en el notebook 02).
-    7. Integridad entre campos: `rad_group` debe ser consistente con
-       `rad`, y `medv_censored` debe ser consistente con `medv`.
-
-    Lanza `DataValidationError` con todas las reglas incumplidas si algo
-    falla; no persiste nada por sí misma (eso lo decide quien la llama).
-    """
+    numeric_columns: list[str],
+) -> list[str]:
+    """Valida que las columnas esperadas sean numéricas."""
     errors: list[str] = []
-
-    # 1. Tipos esperados: las columnas numéricas deben tener dtype numérico.
     for col in numeric_columns:
         if col in df.columns and not pd.api.types.is_numeric_dtype(df[col]):
             errors.append(
                 f"[tipo] La columna '{col}' debería ser numérica, "
                 f"pero tiene tipo '{df[col].dtype}'."
             )
+    return errors
 
-    # 2. Rangos razonables. Si la columna ya tiene un tipo no numérico, se
-    # omite aquí (ya quedó registrada como error de tipo en el paso 1) en
-    # vez de lanzar un error de comparación no controlado.
+
+def _validate_ranges(
+    df: pd.DataFrame,
+    valid_ranges: dict[str, tuple[float, float]],
+) -> list[str]:
+    """Valida que los valores numéricos estén dentro de los rangos permitidos."""
+    errors: list[str] = []
     for col, (low, high) in valid_ranges.items():
         if col not in df.columns or not pd.api.types.is_numeric_dtype(df[col]):
             continue
-        out_of_range = df[col].dropna()
-        out_of_range = out_of_range[(out_of_range < low) | (out_of_range > high)]
+        values = df[col].dropna()
+        out_of_range = values[(values < low) | (values > high)]
         if not out_of_range.empty:
             errors.append(
-                f"[rango] La columna '{col}' tiene {len(out_of_range)} valor(es) "
-                f"fuera del rango permitido [{low}, {high}] "
+                f"[rango] La columna '{col}' tiene {len(out_of_range)} "
+                f"valor(es) fuera del rango permitido [{low}, {high}] "
                 f"(ej. valor observado: {out_of_range.iloc[0]})."
             )
+    return errors
 
-    # 3. Porcentaje máximo de nulos por columna.
+
+def _validate_nulls(
+    df: pd.DataFrame,
+    numeric_columns: list[str],
+    max_null_fraction: float,
+) -> list[str]:
+    """Valida el porcentaje máximo permitido de valores nulos."""
+    errors: list[str] = []
     for col in numeric_columns:
         if col not in df.columns:
             continue
         null_fraction = df[col].isna().mean()
         if null_fraction > max_null_fraction:
             errors.append(
-                f"[nulos] La columna '{col}' tiene {null_fraction:.1%} de valores "
-                f"nulos, por encima del máximo permitido ({max_null_fraction:.0%})."
+                f"[nulos] La columna '{col}' tiene {null_fraction:.1%} "
+                f"de valores nulos, por encima del máximo permitido "
+                f"({max_null_fraction:.0%})."
             )
+    return errors
 
-    # 4. Categorías válidas.
+
+def _validate_categories(
+    df: pd.DataFrame,
+    valid_categories: dict[str, set],
+) -> list[str]:
+    """Valida las categorías permitidas para las variables categóricas."""
+    errors: list[str] = []
     for col, allowed_values in valid_categories.items():
         if col not in df.columns:
             continue
@@ -275,27 +271,36 @@ def validate_input_data(
         invalid_values = observed_values - allowed_values
         if invalid_values:
             errors.append(
-                f"[categoría] La columna '{col}' contiene categorías inválidas "
-                f"{sorted(invalid_values, key=str)}; valores permitidos: "
-                f"{sorted(allowed_values, key=str)}."
+                f"[categoría] La columna '{col}' contiene categorías "
+                f"inválidas {sorted(invalid_values, key=str)}; valores "
+                f"permitidos: {sorted(allowed_values, key=str)}."
             )
+    return errors
 
-    # 5. Fechas: el dataset de Precios-Casas-Boston no tiene columnas de
-    # fecha, por lo que esta regla no aplica y no se inventa una.
 
-    # 6. Unicidad: no deberían existir filas 100% duplicadas en esta etapa
-    # (ya se eliminan en `clean_data`); se revalida aquí como control de
-    # integridad independiente de que el orden de las funciones cambie.
+def _validate_uniqueness(df: pd.DataFrame) -> list[str]:
+    """Valida que no existan filas completamente duplicadas."""
     n_duplicates = int(df.duplicated().sum())
-    if n_duplicates > 0:
-        errors.append(
+    if n_duplicates == 0:
+        return []
+    return [
+        (
             f"[unicidad] Se encontraron {n_duplicates} fila(s) completamente "
             "duplicadas; se esperaba que ya estuvieran eliminadas."
         )
+    ]
 
-    # 7. Integridad entre campos.
+
+def _validate_field_integrity(df: pd.DataFrame) -> list[str]:
+    """Valida la consistencia entre variables derivadas y sus variables base."""
+    errors: list[str] = []
+
     if {"rad", "rad_group"}.issubset(df.columns):
-        expected_group = np.where(df["rad"] == RAD_HIGH_VALUE, "alto", "bajo")
+        expected_group = np.where(
+            df["rad"] == RAD_HIGH_VALUE,
+            "alto",
+            "bajo",
+        )
         mismatched = int((df["rad_group"].to_numpy() != expected_group).sum())
         if mismatched > 0:
             errors.append(
@@ -309,10 +314,33 @@ def validate_input_data(
         mismatched = int((df["medv_censored"] != expected_flag).sum())
         if mismatched > 0:
             errors.append(
-                f"[integridad] 'medv_censored' es inconsistente con 'medv' en "
-                f"{mismatched} fila(s): debería ser 1 únicamente cuando "
+                f"[integridad] 'medv_censored' es inconsistente con 'medv' "
+                f"en {mismatched} fila(s): debería ser 1 únicamente cuando "
                 f"medv == {MEDV_CENSORED_VALUE}."
             )
+
+    return errors
+
+
+def validate_input_data(
+    df: pd.DataFrame,
+    numeric_columns: list[str] = EXPECTED_NUMERIC_COLUMNS,
+    valid_ranges: dict[str, tuple[float, float]] = VALID_RANGES,
+    valid_categories: dict[str, set] = VALID_CATEGORIES,
+    max_null_fraction: float = MAX_NULL_FRACTION,
+) -> None:
+    """Valida calidad, consistencia, formato e integridad de los datos.
+
+    Las fechas no se validan porque el dataset no contiene columnas de fecha.
+    """
+    errors: list[str] = []
+
+    errors.extend(_validate_types(df, numeric_columns))
+    errors.extend(_validate_ranges(df, valid_ranges))
+    errors.extend(_validate_nulls(df, numeric_columns, max_null_fraction))
+    errors.extend(_validate_categories(df, valid_categories))
+    errors.extend(_validate_uniqueness(df))
+    errors.extend(_validate_field_integrity(df))
 
     if errors:
         raise DataValidationError(
@@ -346,8 +374,7 @@ def validate_processed_features(
 
     if list(x_train.columns) != list(x_test.columns):
         errors.append(
-            "[formato] 'x_train' y 'x_test' no tienen las mismas columnas "
-            "tras la transformación."
+            "[formato] 'x_train' y 'x_test' no tienen las mismas columnas tras la transformación."
         )
 
     train_nulls = int(x_train.isna().sum().sum())
@@ -542,9 +569,7 @@ def run_feature_pipeline(
     x_train, x_test, y_train, y_test = split_train_test(boston_features)
 
     preprocessor = build_preprocessor()
-    x_train_transformed, x_test_transformed = fit_transform_features(
-        preprocessor, x_train, x_test
-    )
+    x_train_transformed, x_test_transformed = fit_transform_features(preprocessor, x_train, x_test)
 
     # Validar las features ya procesadas ANTES de persistirlas.
     validate_processed_features(x_train_transformed, x_test_transformed, y_train, y_test)
