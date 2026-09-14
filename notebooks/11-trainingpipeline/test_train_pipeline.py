@@ -10,7 +10,6 @@ evaluación.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import joblib
@@ -19,11 +18,10 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import GradientBoostingRegressor
 
-# Permite importar `pipelines.train_pipeline` al ejecutar pytest desde la
-# raíz del proyecto o desde cualquier otro directorio.
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+TRAIN_ROWS = 20
+TEST_ROWS = 10
+SMALL_N_ESTIMATORS = 5
+MAX_EXPECTED_MAE = 5
 
 import train_pipeline as tp
 
@@ -72,19 +70,23 @@ def test_load_processed_features_reads_expected_shapes(
     y_train_path = tmp_path / "y_train.parquet"
     y_test_path = tmp_path / "y_test.parquet"
 
-    small_features_df.iloc[:20].to_parquet(x_train_path, engine="pyarrow")
-    small_features_df.iloc[20:].to_parquet(x_test_path, engine="pyarrow")
-    small_target_series.iloc[:20].to_frame().to_parquet(y_train_path, engine="pyarrow")
-    small_target_series.iloc[20:].to_frame().to_parquet(y_test_path, engine="pyarrow")
+    small_features_df.iloc[:TRAIN_ROWS].to_parquet(x_train_path, engine="pyarrow")
+    small_features_df.iloc[TRAIN_ROWS:].to_parquet(x_test_path, engine="pyarrow")
+    small_target_series.iloc[:TRAIN_ROWS].to_frame().to_parquet(
+        y_train_path, engine="pyarrow"
+    )
+    small_target_series.iloc[TRAIN_ROWS:].to_frame().to_parquet(
+        y_test_path, engine="pyarrow"
+    )
 
     x_train, x_test, y_train, y_test = tp.load_processed_features(
         x_train_path, x_test_path, y_train_path, y_test_path
     )
 
-    assert x_train.shape == (20, small_features_df.shape[1])
-    assert x_test.shape == (10, small_features_df.shape[1])
-    assert len(y_train) == 20
-    assert len(y_test) == 10
+    assert x_train.shape == (TRAIN_ROWS, small_features_df.shape[1])
+    assert x_test.shape == (TEST_ROWS, small_features_df.shape[1])
+    assert len(y_train) == TRAIN_ROWS
+    assert len(y_test) == TEST_ROWS
     assert y_train.name == "medv"
 
 
@@ -132,9 +134,9 @@ def test_build_model_returns_gradient_boosting_with_expected_hyperparameters() -
 
 def test_build_model_allows_overriding_hyperparameters_for_tests() -> None:
     """Las pruebas pueden pedir un modelo más pequeño/rápido sin tocar el default."""
-    model = tp.build_model(n_estimators=5)
+    model = tp.build_model(n_estimators=SMALL_N_ESTIMATORS)
 
-    assert model.n_estimators == 5
+    assert model.n_estimators == SMALL_N_ESTIMATORS
     # El resto de hiperparámetros del POC no cambia
     assert model.learning_rate == tp.MODEL_HYPERPARAMETERS["learning_rate"]
 
@@ -143,7 +145,7 @@ def test_train_model_fits_successfully(
     small_features_df: pd.DataFrame, small_target_series: pd.Series
 ) -> None:
     x_train = tp.drop_leakage_columns(small_features_df)
-    model = tp.build_model(n_estimators=5)
+    model = tp.build_model(n_estimators=SMALL_N_ESTIMATORS)
 
     trained_model = tp.train_model(model, x_train, small_target_series)
 
@@ -162,7 +164,9 @@ def test_predict_generates_expected_number_of_predictions(
     small_features_df: pd.DataFrame, small_target_series: pd.Series
 ) -> None:
     x_train = tp.drop_leakage_columns(small_features_df)
-    model = tp.train_model(tp.build_model(n_estimators=5), x_train, small_target_series)
+    model = tp.train_model(
+        tp.build_model(n_estimators=SMALL_N_ESTIMATORS), x_train, small_target_series
+    )
 
     predictions = tp.predict(model, x_train)
 
@@ -182,7 +186,7 @@ def test_compute_regression_metrics_returns_valid_values() -> None:
     assert metrics["MAPE"] >= 0
     assert metrics["R2"] <= 1
     # Para predicciones cercanas al valor real, el error debe ser pequeño
-    assert metrics["MAE"] < 5
+    assert metrics["MAE"] < MAX_EXPECTED_MAE
 
 
 def test_compute_regression_metrics_perfect_predictions_are_ideal() -> None:
@@ -206,7 +210,9 @@ def test_save_model_creates_file_and_can_be_reloaded(
     tmp_path: Path, small_features_df: pd.DataFrame, small_target_series: pd.Series
 ) -> None:
     x_train = tp.drop_leakage_columns(small_features_df)
-    model = tp.train_model(tp.build_model(n_estimators=5), x_train, small_target_series)
+    model = tp.train_model(
+        tp.build_model(n_estimators=SMALL_N_ESTIMATORS), x_train, small_target_series
+    )
     model_path = tmp_path / "modelo" / "train_pipeline_model.joblib"
 
     tp.save_model(model, model_path)
@@ -252,10 +258,14 @@ def test_run_train_pipeline_end_to_end(
     model_path = tmp_path / "models" / "train_pipeline_model.joblib"
     metrics_path = tmp_path / "model_output" / "train_pipeline_metrics.json"
 
-    small_features_df.iloc[:20].to_parquet(x_train_path, engine="pyarrow")
-    small_features_df.iloc[20:].to_parquet(x_test_path, engine="pyarrow")
-    small_target_series.iloc[:20].to_frame().to_parquet(y_train_path, engine="pyarrow")
-    small_target_series.iloc[20:].to_frame().to_parquet(y_test_path, engine="pyarrow")
+    small_features_df.iloc[:TRAIN_ROWS].to_parquet(x_train_path, engine="pyarrow")
+    small_features_df.iloc[TRAIN_ROWS:].to_parquet(x_test_path, engine="pyarrow")
+    small_target_series.iloc[:TRAIN_ROWS].to_frame().to_parquet(
+        y_train_path, engine="pyarrow"
+    )
+    small_target_series.iloc[TRAIN_ROWS:].to_frame().to_parquet(
+        y_test_path, engine="pyarrow"
+    )
 
     results = tp.run_train_pipeline(
         x_train_path=x_train_path,
