@@ -106,18 +106,14 @@ def drop_redundant_features(
     return df.drop(columns=columns_to_drop)
 
 
-def add_rad_group_feature(
-    df: pd.DataFrame, high_value: int = RAD_HIGH_VALUE
-) -> pd.DataFrame:
+def add_rad_group_feature(df: pd.DataFrame, high_value: int = RAD_HIGH_VALUE) -> pd.DataFrame:
     """Crea el atributo derivado `rad_group` (Feature Engineering).
 
     Captura de forma explícita el grupo `rad = 24`, que se comporta de
     forma distinta al resto según el análisis bivariable/multivariable.
     """
     df_engineered = df.copy()
-    df_engineered["rad_group"] = np.where(
-        df_engineered["rad"] == high_value, "alto", "bajo"
-    )
+    df_engineered["rad_group"] = np.where(df_engineered["rad"] == high_value, "alto", "bajo")
     return df_engineered
 
 
@@ -274,13 +270,9 @@ def run_feature_pipeline(
     x_train, x_test, y_train, y_test = split_train_test(boston_features)
 
     preprocessor = build_preprocessor()
-    x_train_transformed, x_test_transformed = fit_transform_features(
-        preprocessor, x_train, x_test
-    )
+    x_train_transformed, x_test_transformed = fit_transform_features(preprocessor, x_train, x_test)
 
-    save_processed_features(
-        x_train_transformed, x_test_transformed, y_train, y_test, output_dir
-    )
+    save_processed_features(x_train_transformed, x_test_transformed, y_train, y_test, output_dir)
 
     return {
         "x_train": x_train_transformed,
