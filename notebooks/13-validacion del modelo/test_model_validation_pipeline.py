@@ -26,7 +26,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipelines import model_validation_pipeline as mvp
+EXPECTED_CHECKS_MIN = 5
+EXPECTED_N_SPLITS = 3
+
+from pipelines import model_validation_pipeline as mvp  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures: datos ficticios pequeños con la misma forma que produce el
@@ -86,7 +89,7 @@ def test_valid_split_passes_without_raising(
     assert result.passed
     assert result.failed_checks() == []
     # Se registran múltiples checks, no solo un booleano "passed".
-    assert len(result.checks) > 5
+    assert len(result.checks) > EXPECTED_CHECKS_MIN
     assert any(c.name == "overlap_indices" and c.status == "passed" for c in result.checks)
 
 
@@ -101,7 +104,7 @@ def test_shared_index_raises_leakage_error(
     x_train = valid_split["x_train"]
     x_test = valid_split["x_test"].copy()
     # Fuerza un índice de test a coincidir con uno de train.
-    x_test.index = [x_train.index[0]] + list(x_test.index[1:])
+    x_test.index = [x_train.index[0], *list(x_test.index[1:])]
 
     with pytest.raises(mvp.TrainTestSplitValidationError, match="overlap_indices"):
         mvp.validate_train_test_split(
@@ -454,11 +457,11 @@ def test_cross_validation_with_valid_data_returns_scores_per_fold(
     )
 
     assert isinstance(result, mvp.CrossValidationResult)
-    assert result.n_splits == 3
+    assert result.n_splits == EXPECTED_N_SPLITS
     assert set(result.scores.keys()) == {"MAE", "RMSE", "R2", "MAPE"}
     # Cada métrica debe tener exactamente un valor por fold.
     for metric_scores in result.scores.values():
-        assert len(metric_scores) == 3
+        assert len(metric_scores) == EXPECTED_N_SPLITS
 
 
 def test_cross_validation_mean_and_std_are_computed_correctly(
@@ -491,7 +494,7 @@ def test_cross_validation_result_to_dict_contains_fold_and_summary_values(
     payload = result.to_dict()
 
     assert payload["strategy"] == "KFold(shuffle=True)"
-    assert payload["n_splits"] == 3
+    assert payload["n_splits"] == EXPECTED_N_SPLITS
     assert set(payload["scores_by_fold"].keys()) == {"MAE", "RMSE", "R2", "MAPE"}
     assert set(payload["mean"].keys()) == {"MAE", "RMSE", "R2", "MAPE"}
     assert set(payload["std"].keys()) == {"MAE", "RMSE", "R2", "MAPE"}
@@ -765,7 +768,7 @@ def test_run_model_validation_pipeline_end_to_end(
 
     assert isinstance(result, mvp.ModelValidationResult)
     assert set(result.train_metrics.keys()) == {"MAE", "RMSE", "R2", "MAPE"}
-    assert result.cv_result.n_splits == 3
+    assert result.cv_result.n_splits == EXPECTED_N_SPLITS
     assert metrics_path.exists()
     assert log_path.exists()
     assert comparison_plot_path.exists()

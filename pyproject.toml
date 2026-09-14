@@ -3,7 +3,7 @@ name = "template-data-science-container"
 version = "0.1.0"
 description = "Template for data science and AI Projects with the last stable version of python and devcontainer"
 authors = [
-    "Jose R. Zapata <joserzapata.github.io>",
+    { name = "Jose R. Zapata" },
 ]
 requires-python = ">=3.12"
 readme = "README.md"

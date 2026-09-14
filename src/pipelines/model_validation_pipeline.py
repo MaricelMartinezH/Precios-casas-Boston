@@ -62,6 +62,10 @@ from pathlib import Path
 from typing import TypedDict, Unpack
 
 import joblib
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp
@@ -78,6 +82,7 @@ X_TRAIN_PATH = tp.X_TRAIN_PATH
 X_TEST_PATH = tp.X_TEST_PATH
 Y_TRAIN_PATH = tp.Y_TRAIN_PATH
 Y_TEST_PATH = tp.Y_TEST_PATH
+MIN_VALUES_FOR_STATISTICAL_TEST = 2
 TARGET_COL = tp.TARGET_COL
 
 # Resultados de esta Issue en el mismo directorio de salidas de modelo que
@@ -403,7 +408,7 @@ def _check_target_presence(
     return checks
 
 
-def _check_sizes(
+def _check_sizes(  # noqa: PLR0913, PLR0917
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     min_train_size: int,
@@ -523,7 +528,10 @@ def _check_numeric_drift(
             continue
         train_vals = x_train[col].dropna()
         test_vals = x_test[col].dropna()
-        if len(train_vals) < 2 or len(test_vals) < 2:
+        if (
+            len(train_vals) < MIN_VALUES_FOR_STATISTICAL_TEST
+            or len(test_vals) < MIN_VALUES_FOR_STATISTICAL_TEST
+        ):
             continue
 
         statistic, _p_value = ks_2samp(train_vals, test_vals)
@@ -623,7 +631,10 @@ def _check_target_drift(y_train: pd.Series, y_test: pd.Series, threshold: float)
     """
     train_vals = pd.Series(y_train).dropna()
     test_vals = pd.Series(y_test).dropna()
-    if len(train_vals) < 2 or len(test_vals) < 2:
+    if (
+        len(train_vals) < MIN_VALUES_FOR_STATISTICAL_TEST
+        or len(test_vals) < MIN_VALUES_FOR_STATISTICAL_TEST
+    ):
         return CheckResult(
             "label_drift",
             "passed",
@@ -716,7 +727,7 @@ class ValidateTrainTestSplitKwargs(TypedDict, total=False):
     time_column: str | None
 
 
-def validate_train_test_split(
+def validate_train_test_split(  # noqa: PLR0913
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     y_train: pd.Series,
@@ -936,7 +947,7 @@ def validate_model_with_cross_validation(
     a 2, o si no hay suficientes filas en `x_train` para ese número de
     particiones.
     """
-    if n_splits < 2:
+    if n_splits < MIN_VALUES_FOR_STATISTICAL_TEST:
         raise ValueError(
             f"n_splits debe ser al menos 2 para poder hacer cross-validation (se recibió {n_splits})."
         )
@@ -1228,11 +1239,6 @@ def _plot_train_cv_test_comparison(result: ModelValidationResult, output_path: P
     """Genera una gráfica de barras comparando TRAIN/CV/TEST por métrica
     (evidencia visual del punto 8 de la Issue).
     """
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
     metric_names = ["MAE", "RMSE", "R2", "MAPE"]
     x_positions = np.arange(len(metric_names))
     bar_width = 0.25
@@ -1270,11 +1276,6 @@ def _plot_cv_scores_by_fold(
     """Genera una gráfica de la métrica principal por fold de
     cross-validation (evidencia visual de la variabilidad entre folds).
     """
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
     fold_scores = cv_result.scores.get(metric, [])
     fold_numbers = np.arange(1, len(fold_scores) + 1)
 
@@ -1323,7 +1324,7 @@ def save_model_validation_evidence(
     _plot_cv_scores_by_fold(result.cv_result, cv_plot_path, metric=tp.MAIN_METRIC)
 
 
-def run_model_validation_pipeline(
+def run_model_validation_pipeline(  # noqa: PLR0913, PLR0917
     x_train_path: Path = X_TRAIN_PATH,
     x_test_path: Path = X_TEST_PATH,
     y_train_path: Path = Y_TRAIN_PATH,
