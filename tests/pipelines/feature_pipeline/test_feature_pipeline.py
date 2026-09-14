@@ -21,7 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipelines.feature_pipeline import feature_pipeline as fp  # noqa: E402
+from pipelines.feature_pipeline import feature_pipeline as fp
 
 
 @pytest.fixture
@@ -64,14 +64,18 @@ def test_load_intermediate_data(tmp_path: Path, raw_boston_df: pd.DataFrame) -> 
     assert list(loaded_df.columns) == list(raw_boston_df.columns)
 
 
-def test_select_initial_columns_returns_expected_columns(raw_boston_df: pd.DataFrame) -> None:
+def test_select_initial_columns_returns_expected_columns(
+    raw_boston_df: pd.DataFrame,
+) -> None:
     result = fp.select_initial_columns(raw_boston_df)
 
     assert list(result.columns) == fp.SELECTED_FEATURES
     assert result.shape[0] == raw_boston_df.shape[0]
 
 
-def test_clean_data_drops_duplicates_and_missing_target(raw_boston_df: pd.DataFrame) -> None:
+def test_clean_data_drops_duplicates_and_missing_target(
+    raw_boston_df: pd.DataFrame,
+) -> None:
     result = fp.clean_data(raw_boston_df)
 
     # Se eliminan las 4 filas duplicadas (quedan 4 filas únicas) y la fila
@@ -93,7 +97,9 @@ def test_flag_censored_target_marks_expected_rows(raw_boston_df: pd.DataFrame) -
     assert set(result["medv_censored"].unique()).issubset({0, 1})
 
 
-def test_drop_redundant_features_removes_tax_column(raw_boston_df: pd.DataFrame) -> None:
+def test_drop_redundant_features_removes_tax_column(
+    raw_boston_df: pd.DataFrame,
+) -> None:
     assert "tax" in raw_boston_df.columns
 
     result = fp.drop_redundant_features(raw_boston_df)
@@ -103,7 +109,9 @@ def test_drop_redundant_features_removes_tax_column(raw_boston_df: pd.DataFrame)
     assert set(result.columns) == set(raw_boston_df.columns) - {"tax"}
 
 
-def test_add_rad_group_feature_creates_expected_categories(raw_boston_df: pd.DataFrame) -> None:
+def test_add_rad_group_feature_creates_expected_categories(
+    raw_boston_df: pd.DataFrame,
+) -> None:
     result = fp.add_rad_group_feature(raw_boston_df)
 
     assert "rad_group" in result.columns
@@ -114,7 +122,9 @@ def test_add_rad_group_feature_creates_expected_categories(raw_boston_df: pd.Dat
 
 def test_split_train_test_shapes_and_no_leakage(raw_boston_df: pd.DataFrame) -> None:
     prepared_df = fp.add_rad_group_feature(
-        fp.drop_redundant_features(fp.flag_censored_target(fp.clean_data(raw_boston_df)))
+        fp.drop_redundant_features(
+            fp.flag_censored_target(fp.clean_data(raw_boston_df))
+        )
     )
 
     x_train, x_test, y_train, y_test = fp.split_train_test(
@@ -145,9 +155,13 @@ def test_fit_transform_features_produces_numeric_matrix_without_nulls(
     raw_boston_df: pd.DataFrame,
 ) -> None:
     prepared_df = fp.add_rad_group_feature(
-        fp.drop_redundant_features(fp.flag_censored_target(fp.clean_data(raw_boston_df)))
+        fp.drop_redundant_features(
+            fp.flag_censored_target(fp.clean_data(raw_boston_df))
+        )
     )
-    x_train, x_test, _, _ = fp.split_train_test(prepared_df, test_size=0.5, random_state=42)
+    x_train, x_test, _, _ = fp.split_train_test(
+        prepared_df, test_size=0.5, random_state=42
+    )
 
     preprocessor = fp.build_preprocessor()
     x_train_transformed, x_test_transformed = fp.fit_transform_features(
@@ -155,8 +169,9 @@ def test_fit_transform_features_produces_numeric_matrix_without_nulls(
     )
 
     # Todas las columnas resultantes deben ser numéricas y sin nulos
-    assert x_train_transformed.select_dtypes(include="number").shape[1] == (
-        x_train_transformed.shape[1]
+    assert (
+        x_train_transformed.select_dtypes(include="number").shape[1]
+        == (x_train_transformed.shape[1])
     )
     assert x_train_transformed.isna().sum().sum() == 0
     assert x_test_transformed.isna().sum().sum() == 0
@@ -171,7 +186,9 @@ def test_save_processed_features_writes_expected_files(
     tmp_path: Path, raw_boston_df: pd.DataFrame
 ) -> None:
     prepared_df = fp.add_rad_group_feature(
-        fp.drop_redundant_features(fp.flag_censored_target(fp.clean_data(raw_boston_df)))
+        fp.drop_redundant_features(
+            fp.flag_censored_target(fp.clean_data(raw_boston_df))
+        )
     )
     x_train, x_test, y_train, y_test = fp.split_train_test(
         prepared_df, test_size=0.5, random_state=42
@@ -182,7 +199,9 @@ def test_save_processed_features_writes_expected_files(
     )
 
     output_dir = tmp_path / "03_primary"
-    fp.save_processed_features(x_train_transformed, x_test_transformed, y_train, y_test, output_dir)
+    fp.save_processed_features(
+        x_train_transformed, x_test_transformed, y_train, y_test, output_dir
+    )
 
     expected_files = {
         "x_train_features.parquet",
@@ -194,7 +213,9 @@ def test_save_processed_features_writes_expected_files(
     assert expected_files == created_files
 
 
-def test_run_feature_pipeline_end_to_end(tmp_path: Path, raw_boston_df: pd.DataFrame) -> None:
+def test_run_feature_pipeline_end_to_end(
+    tmp_path: Path, raw_boston_df: pd.DataFrame
+) -> None:
     """Prueba de integración: datos originales -> features procesadas guardadas."""
     input_path = tmp_path / "boston_type_fixed.parquet"
     raw_boston_df.to_parquet(input_path, engine="pyarrow")
