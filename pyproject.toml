@@ -9,7 +9,13 @@ requires-python = ">=3.12"
 readme = "README.md"
 
 dependencies = [
-
+    "joblib>=1.6.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.3",
+    "pandas>=3.0.5",
+    "pyarrow>=25.0.1",
+    "scikit-learn>=1.9.1",
+    "scipy>=1.18.1",
 ]
 
 [project.urls]
@@ -24,6 +30,8 @@ dev = [
     "pytest-cookies>=0.7.0",
     "pytest-cov>=7.1.0",
     "cruft[pyproject]>=2.16.0",# Automated Cookiecutter template synchronization
+    "mypy>=2.3.1",
+    "pandas-stubs>=3.0.5.260914",
 ]
 
 #
