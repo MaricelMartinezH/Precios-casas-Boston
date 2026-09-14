@@ -156,6 +156,32 @@ class TrainTestSplitValidationError(Exception):
 
 
 @dataclass
+@dataclass(frozen=True)
+MIN_VALUES_FOR_DRIFT = 2
+
+
+@dataclass(frozen=True)
+class TrainTestSplitConfig:
+    target_col: str = TARGET_COL
+    id_columns: list[str] | None = None
+    numeric_columns: list[str] | None = None
+    categorical_columns: list[str] | None = None
+    min_train_size: int = DEFAULT_MIN_TRAIN_SIZE
+    min_test_size: int = DEFAULT_MIN_TEST_SIZE
+    min_test_train_ratio: float = DEFAULT_MIN_TEST_TRAIN_RATIO
+    max_test_train_ratio: float = DEFAULT_MAX_TEST_TRAIN_RATIO
+    config.drift_warning_threshold: float = DEFAULT_DRIFT_WARNING_THRESHOLD
+    max_binary_unique: int = DEFAULT_MAX_BINARY_UNIQUE
+    time_column: str | None = None
+
+
+class SizeCheckConfig:
+    min_train_size: int
+    min_test_size: int
+    min_ratio: float
+    max_ratio: float
+
+
 class CheckResult:
     """Resultado individual de un check de validación del split.
 
@@ -206,8 +232,7 @@ class TrainTestSplitValidationResult:
             "passed": self.passed,
             "has_warnings": self.has_warnings,
             "checks": [
-                {"name": c.name, "status": c.status, "message": c.message}
-                for c in self.checks
+                {"name": c.name, "status": c.status, "message": c.message} for c in self.checks
             ],
         }
 
@@ -252,9 +277,7 @@ def _check_duplicate_rows(
     práctica, la misma observación duplicada entre los dos conjuntos.
     """
     columnas_clave = (
-        id_columns
-        if id_columns
-        else [col for col in x_train.columns if col in x_test.columns]
+        id_columns if id_columns else [col for col in x_train.columns if col in x_test.columns]
     )
     if not columnas_clave:
         return CheckResult(
@@ -353,8 +376,7 @@ def _check_target_presence(
             CheckResult(
                 "target_no_nulls",
                 "failed",
-                f"El target tiene valores nulos: {train_nulls} en train, "
-                f"{test_nulls} en test.",
+                f"El target tiene valores nulos: {train_nulls} en train, {test_nulls} en test.",
             )
         )
     else:
@@ -372,22 +394,19 @@ def _check_target_presence(
 def _check_sizes(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
-    min_train_size: int,
-    min_test_size: int,
-    min_ratio: float,
-    max_ratio: float,
+    config: SizeCheckConfig,
 ) -> list[CheckResult]:
     """Checks de tamaño de los conjuntos (equivalente a "Datasets Size Comparison")."""
     checks: list[CheckResult] = []
     n_train, n_test = len(x_train), len(x_test)
 
-    if n_train < min_train_size:
+    if n_train < config.min_train_size:
         checks.append(
             CheckResult(
                 "min_train_size",
                 "failed",
                 f"train tiene {n_train} registro(s), por debajo del mínimo "
-                f"requerido ({min_train_size}) para entrenar el modelo.",
+                f"requerido ({config.min_train_size}) para entrenar el modelo.",
             )
         )
     else:
@@ -399,13 +418,13 @@ def _check_sizes(
             )
         )
 
-    if n_test < min_test_size:
+    if n_test < config.min_test_size:
         checks.append(
             CheckResult(
                 "min_test_size",
                 "failed",
                 f"test tiene {n_test} registro(s), por debajo del mínimo "
-                f"requerido ({min_test_size}) para evaluar el modelo.",
+                f"requerido ({config.min_test_size}) para evaluar el modelo.",
             )
         )
     else:
@@ -418,13 +437,13 @@ def _check_sizes(
         )
 
     ratio = (n_test / n_train) if n_train else float("inf")
-    if n_train and (ratio < min_ratio or ratio > max_ratio):
+    if n_train and (ratio < config.min_ratio or ratio > config.max_ratio):
         checks.append(
             CheckResult(
                 "test_train_ratio",
                 "warning",
                 f"La proporción test/train es {ratio:.2f}, fuera del rango "
-                f"esperado [{min_ratio}, {max_ratio}].",
+                f"esperado [{config.min_ratio}, {config.max_ratio}].",
             )
         )
     else:
@@ -462,10 +481,7 @@ def _infer_column_groups(
     categorical_cols: list[str] = []
     for col in df.columns:
         serie = df[col]
-        if (
-            pd.api.types.is_numeric_dtype(serie)
-            and serie.nunique(dropna=True) > max_binary_unique
-        ):
+        if pd.api.types.is_numeric_dtype(serie) and serie.nunique(dropna=True) > max_binary_unique:
             numeric_cols.append(col)
         else:
             categorical_cols.append(col)
@@ -492,7 +508,7 @@ def _check_numeric_drift(
             continue
         train_vals = x_train[col].dropna()
         test_vals = x_test[col].dropna()
-        if len(train_vals) < 2 or len(test_vals) < 2:
+        if len(train_vals) < MIN_VALUES_FOR_DRIFT or len(test_vals) < MIN_VALUES_FOR_DRIFT:
             continue
 
         statistic, _p_value = ks_2samp(train_vals, test_vals)
@@ -586,15 +602,13 @@ def _check_categorical_drift(
     return checks
 
 
-def _check_target_drift(
-    y_train: pd.Series, y_test: pd.Series, threshold: float
-) -> CheckResult:
+def _check_target_drift(y_train: pd.Series, y_test: pd.Series, threshold: float) -> CheckResult:
     """Check de distribución del target entre train y test (equivalente a
     "Label Drift"), usando Kolmogorov-Smirnov, ya que `medv` es continuo.
     """
     train_vals = pd.Series(y_train).dropna()
     test_vals = pd.Series(y_test).dropna()
-    if len(train_vals) < 2 or len(test_vals) < 2:
+    if len(train_vals) < MIN_VALUES_FOR_DRIFT or len(test_vals) < MIN_VALUES_FOR_DRIFT:
         return CheckResult(
             "label_drift",
             "passed",
@@ -676,18 +690,7 @@ def validate_train_test_split(
     x_test: pd.DataFrame,
     y_train: pd.Series,
     y_test: pd.Series,
-    *,
-    target_col: str = TARGET_COL,
-    id_columns: list[str] | None = None,
-    numeric_columns: list[str] | None = None,
-    categorical_columns: list[str] | None = None,
-    min_train_size: int = DEFAULT_MIN_TRAIN_SIZE,
-    min_test_size: int = DEFAULT_MIN_TEST_SIZE,
-    min_test_train_ratio: float = DEFAULT_MIN_TEST_TRAIN_RATIO,
-    max_test_train_ratio: float = DEFAULT_MAX_TEST_TRAIN_RATIO,
-    drift_warning_threshold: float = DEFAULT_DRIFT_WARNING_THRESHOLD,
-    max_binary_unique: int = DEFAULT_MAX_BINARY_UNIQUE,
-    time_column: str | None = None,
+    config: TrainTestSplitConfig,
 ) -> TrainTestSplitValidationResult:
     """Valida la separación entre `x_train`/`x_test` (y sus targets).
 
@@ -730,33 +733,31 @@ def validate_train_test_split(
     checks: list[CheckResult] = []
 
     checks.append(_check_index_overlap(x_train, x_test))
-    checks.append(_check_duplicate_rows(x_train, x_test, id_columns))
-    checks.extend(_check_target_presence(x_train, x_test, y_train, y_test, target_col))
+    checks.append(_check_duplicate_rows(x_train, x_test, config.id_columns))
+    checks.extend(_check_target_presence(x_train, x_test, y_train, y_test, config.target_col))
     checks.extend(
         _check_sizes(
             x_train,
             x_test,
-            min_train_size,
-            min_test_size,
-            min_test_train_ratio,
-            max_test_train_ratio,
+            SizeCheckConfig(
+                min_train_size=config.min_train_size,
+                min_test_size=config.min_test_size,
+                min_ratio=config.min_test_train_ratio,
+                max_ratio=config.max_test_train_ratio,
+            ),
         )
     )
 
     numeric_cols, categorical_cols = _infer_column_groups(
-        x_train, numeric_columns, categorical_columns, max_binary_unique
+        x_train, config.numeric_columns, config.categorical_columns, config.max_binary_unique
     )
+    checks.extend(_check_numeric_drift(x_train, x_test, numeric_cols, config.drift_warning_threshold))
     checks.extend(
-        _check_numeric_drift(x_train, x_test, numeric_cols, drift_warning_threshold)
+        _check_categorical_drift(x_train, x_test, categorical_cols, config.drift_warning_threshold)
     )
-    checks.extend(
-        _check_categorical_drift(
-            x_train, x_test, categorical_cols, drift_warning_threshold
-        )
-    )
-    checks.append(_check_target_drift(y_train, y_test, drift_warning_threshold))
+    checks.append(_check_target_drift(y_train, y_test, config.drift_warning_threshold))
 
-    temporal_check = _check_temporal_order(x_train, x_test, time_column)
+    temporal_check = _check_temporal_order(x_train, x_test, config.time_column)
     if temporal_check is not None:
         checks.append(temporal_check)
 
@@ -782,7 +783,7 @@ def run_split_check_pipeline(
     y_train_path: Path = Y_TRAIN_PATH,
     y_test_path: Path = Y_TEST_PATH,
     results_path: Path = RESULTS_PATH,
-    **validate_kwargs: object,
+    config: TrainTestSplitConfig = TrainTestSplitConfig(),
 ) -> TrainTestSplitValidationResult:
     """Ejecuta el check completo: lee el split ya persistido y lo valida.
 
@@ -800,9 +801,7 @@ def run_split_check_pipeline(
     )
 
     try:
-        result = validate_train_test_split(
-            x_train, x_test, y_train, y_test, **validate_kwargs
-        )
+        result = validate_train_test_split(x_train, x_test, y_train, y_test, config)
     except TrainTestSplitValidationError as exc:
         results_path.parent.mkdir(parents=True, exist_ok=True)
         payload = TrainTestSplitValidationResult(checks=exc.checks).to_dict()

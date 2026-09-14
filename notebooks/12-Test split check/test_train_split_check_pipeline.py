@@ -10,21 +10,15 @@ temporal.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-# Permite importar `pipelines.train_split_check_pipeline` al ejecutar
-# pytest desde la raíz del proyecto o desde cualquier otro directorio,
-# igual que hace `test_train_pipeline.py` (Issue 3).
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 from pipelines import train_split_check_pipeline as tsc
+
+MIN_EXPECTED_CHECKS = 5
 
 # ---------------------------------------------------------------------------
 # Fixtures: datos ficticios pequeños con la misma forma que produce el
@@ -59,15 +53,23 @@ def valid_split() -> dict[str, pd.DataFrame | pd.Series]:
         index=range(n_train, n_train + n_test),
     )
 
-    y_train = pd.Series(
-        20.0 + 3.0 * x_train["numeric__lstat"], name="medv", index=x_train.index
-    )
-    y_test = pd.Series(
-        20.0 + 3.0 * x_test["numeric__lstat"], name="medv", index=x_test.index
-    )
+    y_train = pd.Series(20.0 + 3.0 * x_train["numeric__lstat"], name="medv", index=x_train.index)
+    y_test = pd.Series(20.0 + 3.0 * x_test["numeric__lstat"], name="medv", index=x_test.index)
 
     return {"x_train": x_train, "x_test": x_test, "y_train": y_train, "y_test": y_test}
 
+
+
+DEFAULT_CONFIG = tsc.TrainTestSplitConfig(target_col="medv")
+SMALL_DATA_CONFIG = tsc.TrainTestSplitConfig(
+    target_col="medv",
+    min_train_size=50,
+    min_test_size=15,
+)
+TEMPORAL_CONFIG = tsc.TrainTestSplitConfig(
+    target_col="medv",
+    time_column="fecha",
+)
 
 # ---------------------------------------------------------------------------
 # CASO 1 — Split válido
@@ -82,16 +84,14 @@ def test_valid_split_passes_without_raising(
         valid_split["x_test"],
         valid_split["y_train"],
         valid_split["y_test"],
-        target_col="medv",
+        DEFAULT_CONFIG,
     )
 
     assert result.passed
     assert result.failed_checks() == []
     # Se registran múltiples checks, no solo un booleano "passed".
-    assert len(result.checks) > 5
-    assert any(
-        c.name == "overlap_indices" and c.status == "passed" for c in result.checks
-    )
+    assert len(result.checks) > MIN_EXPECTED_CHECKS
+    assert any(c.name == "overlap_indices" and c.status == "passed" for c in result.checks)
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ def test_shared_index_raises_leakage_error(
     x_train = valid_split["x_train"]
     x_test = valid_split["x_test"].copy()
     # Fuerza un índice de test a coincidir con uno de train.
-    x_test.index = [x_train.index[0]] + list(x_test.index[1:])
+    x_test.index = [x_train.index[0], *list(x_test.index[1:])]
 
     with pytest.raises(tsc.TrainTestSplitValidationError, match="overlap_indices"):
         tsc.validate_train_test_split(
@@ -113,7 +113,7 @@ def test_shared_index_raises_leakage_error(
             x_test,
             valid_split["y_train"],
             valid_split["y_test"],
-            target_col="medv",
+            DEFAULT_CONFIG,
         )
 
 
@@ -135,9 +135,7 @@ def test_duplicate_row_content_raises_leakage_error(
     )
 
     with pytest.raises(tsc.TrainTestSplitValidationError, match="duplicate_rows"):
-        tsc.validate_train_test_split(
-            x_train, x_test, y_train, y_test, target_col="medv"
-        )
+        tsc.validate_train_test_split(x_train, x_test, y_train, y_test, DEFAULT_CONFIG)
 
 
 def test_target_present_in_features_raises_leakage_error(
@@ -148,15 +146,13 @@ def test_target_present_in_features_raises_leakage_error(
     x_train["medv"] = valid_split["y_train"]
     x_test["medv"] = valid_split["y_test"]
 
-    with pytest.raises(
-        tsc.TrainTestSplitValidationError, match="target_not_in_features"
-    ):
+    with pytest.raises(tsc.TrainTestSplitValidationError, match="target_not_in_features"):
         tsc.validate_train_test_split(
             x_train,
             x_test,
             valid_split["y_train"],
             valid_split["y_test"],
-            target_col="medv",
+            DEFAULT_CONFIG,
         )
 
 
@@ -179,7 +175,7 @@ def test_distribution_mismatch_produces_warning_but_still_passes(
             x_test,
             valid_split["y_train"],
             valid_split["y_test"],
-            target_col="medv",
+            DEFAULT_CONFIG,
         )
 
     assert result.passed  # una diferencia de distribución no es un error crítico
@@ -203,13 +199,12 @@ def test_new_category_in_test_produces_warning(
             x_test,
             valid_split["y_train"],
             valid_split["y_test"],
-            target_col="medv",
+            DEFAULT_CONFIG,
         )
 
     assert result.passed
     assert any(
-        c.name == "new_category_binary__chas" and c.status == "warning"
-        for c in result.checks
+        c.name == "new_category_binary__chas" and c.status == "warning" for c in result.checks
     )
 
 
@@ -230,9 +225,7 @@ def test_train_set_too_small_raises_error(
             valid_split["x_test"],
             y_train_pequeno,
             valid_split["y_test"],
-            target_col="medv",
-            min_train_size=50,
-            min_test_size=15,
+            SMALL_DATA_CONFIG,
         )
 
 
@@ -247,7 +240,7 @@ def test_mismatched_target_length_raises_error(
             valid_split["x_test"],
             y_train_incompleto,
             valid_split["y_test"],
-            target_col="medv",
+            DEFAULT_CONFIG,
         )
 
 
@@ -278,8 +271,7 @@ def test_future_information_in_train_raises_temporal_error(
             x_test,
             valid_split["y_train"],
             valid_split["y_test"],
-            target_col="medv",
-            time_column="fecha",
+            TEMPORAL_CONFIG,
         )
 
 
@@ -296,14 +288,11 @@ def test_temporal_order_respected_passes(
         x_test,
         valid_split["y_train"],
         valid_split["y_test"],
-        target_col="medv",
-        time_column="fecha",
+        TEMPORAL_CONFIG,
     )
 
     assert result.passed
-    assert any(
-        c.name == "temporal_order" and c.status == "passed" for c in result.checks
-    )
+    assert any(c.name == "temporal_order" and c.status == "passed" for c in result.checks)
 
 
 # ---------------------------------------------------------------------------
@@ -319,7 +308,7 @@ def test_result_to_dict_contains_all_checks(
         valid_split["x_test"],
         valid_split["y_train"],
         valid_split["y_test"],
-        target_col="medv",
+        DEFAULT_CONFIG,
     )
 
     payload = result.to_dict()
@@ -355,7 +344,7 @@ def test_run_split_check_pipeline_end_to_end_valid_case(
         y_train_path=y_train_path,
         y_test_path=y_test_path,
         results_path=results_path,
-        target_col="medv",
+        config=DEFAULT_CONFIG,
     )
 
     assert result.passed
@@ -376,7 +365,7 @@ def test_run_split_check_pipeline_writes_results_even_when_it_raises(
 
     x_train = valid_split["x_train"]
     x_test = valid_split["x_test"].copy()
-    x_test.index = [x_train.index[0]] + list(x_test.index[1:])  # fuerza fuga de datos
+    x_test.index = [x_train.index[0], *list(x_test.index[1:])]  # fuerza fuga de datos
 
     x_train.to_parquet(x_train_path, engine="pyarrow")
     x_test.to_parquet(x_test_path, engine="pyarrow")
@@ -390,7 +379,7 @@ def test_run_split_check_pipeline_writes_results_even_when_it_raises(
             y_train_path=y_train_path,
             y_test_path=y_test_path,
             results_path=results_path,
-            target_col="medv",
+            config=DEFAULT_CONFIG,
         )
 
     assert results_path.exists()
