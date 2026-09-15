@@ -231,7 +231,7 @@ def transform_data(
 
     # Misma columna de fuga de datos que excluye `train_pipeline.py`
     # antes de entrenar/predecir.
-    x_model = tp.drop_leakage_columns(x_transformed)
+    x_model = tp.drop_leakage_columns(x_transformed, tp.LEAKAGE_COLUMNS)
     return x_model
 
 
