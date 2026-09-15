@@ -782,7 +782,7 @@ def validate_train_test_split(
     return result
 
 
-def run_split_check_pipeline(  # noqa: PLR0913, PLR0917
+def run_split_check_pipeline(
     x_train_path: Path = X_TRAIN_PATH,
     x_test_path: Path = X_TEST_PATH,
     y_train_path: Path = Y_TRAIN_PATH,
