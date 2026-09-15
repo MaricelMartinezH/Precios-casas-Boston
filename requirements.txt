@@ -1,0 +1,9 @@
+# Dependencias de runtime para despliegue en Streamlit Community Cloud.
+# Generado a partir de uv.lock (uv sync) — solo paquetes necesarios por demo_app.py.
+# Mantener sincronizado con pyproject.toml/uv.lock.
+streamlit==1.63.0
+pandas==3.0.5
+numpy==2.5.3
+scikit-learn==1.9.1
+joblib==1.6.0
+pyarrow==25.0.1
