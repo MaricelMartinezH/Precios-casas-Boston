@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 import io
 from pathlib import Path
@@ -10,7 +11,6 @@ import streamlit as st
 from pipelines.inference_pipeline import (
     generate_predictions,
     load_model,
-    load_new_data,
     transform_data,
 )
 
@@ -35,17 +35,17 @@ FEATURES = [
 
 
 @st.cache_resource
-def load_pipeline():
+def load_pipeline() -> tuple[object, object]:
     model = load_model(MODEL_PATH)
     preprocessor = load_model(PREPROCESSOR_PATH)
     return model, preprocessor
 
 
-def predict_dataframe(df):
+def predict_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     model, preprocessor = load_pipeline()
     transformed_data = transform_data(df, preprocessor)
     predictions = generate_predictions(model, transformed_data)
-    return pd.DataFrame({'medv_predicho': predictions})
+    return pd.DataFrame({"medv_predicho": predictions})
 
 
 st.set_page_config(
@@ -56,13 +56,10 @@ st.set_page_config(
 
 st.title("🏠 Predicción de precios de casas de Boston")
 st.write(
-    "Aplicación para predecir el valor mediano de las viviendas "
-    "a partir de sus características."
+    "Aplicación para predecir el valor mediano de las viviendas a partir de sus características."
 )
 
-tab_individual, tab_batch = st.tabs(
-    ["Predicción individual", "Predicción por lote"]
-)
+tab_individual, tab_batch = st.tabs(["Predicción individual", "Predicción por lote"])
 
 with tab_individual:
     st.header("Predicción individual")
@@ -106,9 +103,7 @@ with tab_individual:
 
 with tab_batch:
     st.header("Predicción por lote")
-    st.write(
-        "Carga un archivo CSV o Parquet con las 13 variables de entrada."
-    )
+    st.write("Carga un archivo CSV o Parquet con las 13 variables de entrada.")
 
     uploaded_file = st.file_uploader(
         "Selecciona el archivo de datos",
@@ -128,25 +123,21 @@ with tab_batch:
             missing = [feature for feature in FEATURES if feature not in input_df.columns]
 
             if missing:
-                st.error(
-                    "Faltan las siguientes columnas requeridas: "
-                    + ", ".join(missing)
+                st.error("Faltan las siguientes columnas requeridas: " + ", ".join(missing))
+            elif st.button("Generar predicciones", type="primary"):
+                result = predict_dataframe(input_df)
+
+                st.subheader("Resultados")
+                st.dataframe(result)
+
+                csv = result.to_csv(index=False).encode("utf-8")
+
+                st.download_button(
+                    "Descargar predicciones",
+                    data=csv,
+                    file_name="predicciones_boston.csv",
+                    mime="text/csv",
                 )
-            else:
-                if st.button("Generar predicciones", type="primary"):
-                    result = predict_dataframe(input_df)
-
-                    st.subheader("Resultados")
-                    st.dataframe(result)
-
-                    csv = result.to_csv(index=False).encode("utf-8")
-
-                    st.download_button(
-                        "Descargar predicciones",
-                        data=csv,
-                        file_name="predicciones_boston.csv",
-                        mime="text/csv",
-                    )
 
         except Exception as error:
             st.error(f"No fue posible procesar el archivo: {error}")
