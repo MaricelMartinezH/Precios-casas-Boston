@@ -13,7 +13,7 @@ La aplicación ofrece dos modalidades:
 
 Desde la raíz del proyecto:
 
-`uv run streamlit run app.py`
+`uv run streamlit run demo_app.py`
 
 La aplicación estará disponible en `http://localhost:8501`.
 
