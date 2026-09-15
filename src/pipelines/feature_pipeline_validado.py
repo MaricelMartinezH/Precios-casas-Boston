@@ -46,7 +46,7 @@ from sklearn.preprocessing import (
 )
 
 # Raíz del proyecto: este archivo vive en <root>/pipelines/feature_pipeline.py
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 
 INPUT_PATH = DATA_DIR / "02_intermediate" / "boston_type_fixed.parquet"
