@@ -14,11 +14,6 @@ on:
 
 permissions:
   issues: write
-#
-permissions:
-  contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   labeler:
@@ -31,7 +26,6 @@ jobs:
         uses: crazy-max/ghaction-github-labeler@v5
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-token: ${{ github.token }}
           yaml-file: .github/labels.yml
           dry-run: ${{ github.event_name == 'pull_request' }}
           exclude: |
