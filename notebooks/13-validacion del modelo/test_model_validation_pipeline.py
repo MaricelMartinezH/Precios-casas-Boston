@@ -29,7 +29,7 @@ if str(PROJECT_ROOT) not in sys.path:
 EXPECTED_CHECKS_MIN = 5
 EXPECTED_N_SPLITS = 3
 
-from pipelines import model_validation_pipeline as mvp  # noqa: E402
+from pipelines import model_validation_pipeline as mvp
 
 # ---------------------------------------------------------------------------
 # Fixtures: datos ficticios pequeños con la misma forma que produce el

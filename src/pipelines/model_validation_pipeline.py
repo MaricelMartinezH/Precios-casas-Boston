@@ -408,7 +408,7 @@ def _check_target_presence(
     return checks
 
 
-def _check_sizes(  # noqa: PLR0913, PLR0917
+def _check_sizes(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     min_train_size: int,
@@ -727,7 +727,7 @@ class ValidateTrainTestSplitKwargs(TypedDict, total=False):
     time_column: str | None
 
 
-def validate_train_test_split(  # noqa: PLR0913
+def validate_train_test_split(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     y_train: pd.Series,
@@ -1324,7 +1324,7 @@ def save_model_validation_evidence(
     _plot_cv_scores_by_fold(result.cv_result, cv_plot_path, metric=tp.MAIN_METRIC)
 
 
-def run_model_validation_pipeline(  # noqa: PLR0913, PLR0917
+def run_model_validation_pipeline(
     x_train_path: Path = X_TRAIN_PATH,
     x_test_path: Path = X_TEST_PATH,
     y_train_path: Path = Y_TRAIN_PATH,

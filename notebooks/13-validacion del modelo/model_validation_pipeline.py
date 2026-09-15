@@ -403,7 +403,7 @@ def _check_target_presence(
     return checks
 
 
-def _check_sizes(  # noqa: PLR0913, PLR0917
+def _check_sizes(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     min_train_size: int,
@@ -716,7 +716,7 @@ class ValidateTrainTestSplitKwargs(TypedDict, total=False):
     time_column: str | None
 
 
-def validate_train_test_split(  # noqa: PLR0913
+def validate_train_test_split(
     x_train: pd.DataFrame,
     x_test: pd.DataFrame,
     y_train: pd.Series,
@@ -1228,10 +1228,10 @@ def _plot_train_cv_test_comparison(result: ModelValidationResult, output_path: P
     """Genera una gráfica de barras comparando TRAIN/CV/TEST por métrica
     (evidencia visual del punto 8 de la Issue).
     """
-    import matplotlib  # noqa: PLC0415
+    import matplotlib
 
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt  # noqa: PLC0415
+    import matplotlib.pyplot as plt
 
     metric_names = ["MAE", "RMSE", "R2", "MAPE"]
     x_positions = np.arange(len(metric_names))
@@ -1270,10 +1270,10 @@ def _plot_cv_scores_by_fold(
     """Genera una gráfica de la métrica principal por fold de
     cross-validation (evidencia visual de la variabilidad entre folds).
     """
-    import matplotlib  # noqa: PLC0415
+    import matplotlib
 
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt  # noqa: PLC0415
+    import matplotlib.pyplot as plt
 
     fold_scores = cv_result.scores.get(metric, [])
     fold_numbers = np.arange(1, len(fold_scores) + 1)
@@ -1323,7 +1323,7 @@ def save_model_validation_evidence(
     _plot_cv_scores_by_fold(result.cv_result, cv_plot_path, metric=tp.MAIN_METRIC)
 
 
-def run_model_validation_pipeline(  # noqa: PLR0913, PLR0917
+def run_model_validation_pipeline(
     x_train_path: Path = X_TRAIN_PATH,
     x_test_path: Path = X_TEST_PATH,
     y_train_path: Path = Y_TRAIN_PATH,
