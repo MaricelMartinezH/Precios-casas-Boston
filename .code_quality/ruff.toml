@@ -70,6 +70,12 @@ ignore = [
     "S101", # bandit: Use of `assert` detected
     "E501", # Like Black, ignore E501 (line too long) to avoid conflicts.
     "TRY003", # tryceratops: Avoid long error messages
+    "C901",    # Complejidad de funciones existentes
+    "PLR0912",  # Demasiadas ramas
+    "PLR0913",  # Demasiados argumentos
+    "PLR0917",  # Demasiados argumentos posicionales
+    "E402",     # Imports después de código de configuración
+    "PLC0415",  # Imports locales intencionales
     ]
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]

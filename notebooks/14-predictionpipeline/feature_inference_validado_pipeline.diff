@@ -1,0 +1,85 @@
+--- /tmp/orig/feature_pipeline_validado.py	2026-09-13 21:46:03.000000000 +0000
++++ /mnt/user-data/outputs/feature_pipeline_validado.py	2026-09-13 23:05:03.587436392 +0000
+@@ -16,6 +16,13 @@
+     leer datos -> transformar -> validar -> (si OK) persistir
+                                           -> (si falla) error, sin persistir
+ 
++Además de las features/targets, se persiste el `ColumnTransformer` ya
++ajustado (`data/03_primary/preprocessor.joblib`). Esto lo agrega la Issue
++de Inference Pipeline: sin el preprocesador ajustado no habría forma de
++transformar datos nuevos de forma consistente con el entrenamiento sin
++reajustarlo (lo que cambiaría medias/desviaciones, categorías, etc.). El
++resto del flujo de esta Issue (2) no cambia.
++
+ Uso:
+     python pipelines/feature_pipeline_validado.py
+ """
+@@ -24,6 +31,7 @@
+ 
+ from pathlib import Path
+ 
++import joblib
+ import numpy as np
+ import pandas as pd
+ from sklearn.compose import ColumnTransformer
+@@ -44,6 +52,15 @@
+ INPUT_PATH = DATA_DIR / "02_intermediate" / "boston_type_fixed.parquet"
+ OUTPUT_DIR = DATA_DIR / "03_primary"
+ 
++# Preprocesador (ColumnTransformer) ya AJUSTADO sobre `x_train`. Se persiste
++# junto a las features (Issue: Inference Pipeline) para que la inferencia
++# sobre datos nuevos pueda reutilizar exactamente los mismos parámetros
++# aprendidos en entrenamiento (medias/desviaciones del `StandardScaler`,
++# categorías del `OneHotEncoder`, bordes del `KBinsDiscretizer`, etc.) en
++# vez de reajustar un preprocesador distinto con `fit_transform`, lo que
++# introduciría inconsistencias entre training e inference.
++PREPROCESSOR_FILENAME = "preprocessor.joblib"
++
+ # Columnas seleccionadas al inicio del notebook de feature engineering
+ SELECTED_FEATURES = [
+     "crim",
+@@ -517,6 +534,25 @@
+     y_test.to_frame().to_parquet(output_dir / "y_test.parquet", engine="pyarrow")
+ 
+ 
++def save_preprocessor(
++    preprocessor: ColumnTransformer,
++    output_dir: Path = OUTPUT_DIR,
++    filename: str = PREPROCESSOR_FILENAME,
++) -> Path:
++    """Persiste el `ColumnTransformer` ya ajustado (`fit`) sobre `x_train`.
++
++    Se guarda por separado de `save_processed_features` (que ya tiene sus
++    propias pruebas unitarias sobre el conjunto exacto de archivos que
++    produce) para no alterar ese contrato. Lo usa `inference_pipeline.py`
++    (Issue: Inference Pipeline) para transformar datos nuevos con
++    `.transform()`, sin volver a ajustar (`fit`) el preprocesador.
++    """
++    output_dir.mkdir(parents=True, exist_ok=True)
++    preprocessor_path = output_dir / filename
++    joblib.dump(preprocessor, preprocessor_path)
++    return preprocessor_path
++
++
+ def run_feature_pipeline(
+     input_path: Path = INPUT_PATH,
+     output_dir: Path = OUTPUT_DIR,
+@@ -551,6 +587,10 @@
+ 
+     save_processed_features(x_train_transformed, x_test_transformed, y_train, y_test, output_dir)
+ 
++    # Persistir el preprocesador ya ajustado para que `inference_pipeline.py`
++    # pueda reutilizarlo tal cual (ver docstring de `save_preprocessor`).
++    save_preprocessor(preprocessor, output_dir)
++
+     return {
+         "x_train": x_train_transformed,
+         "x_test": x_test_transformed,
+@@ -565,6 +605,7 @@
+     print(f"Features procesadas guardadas en: {OUTPUT_DIR}")
+     print(f"x_train shape: {results['x_train'].shape}")
+     print(f"x_test shape: {results['x_test'].shape}")
++    print(f"Preprocesador ajustado guardado en: {OUTPUT_DIR / PREPROCESSOR_FILENAME}")
+ 
+ 
+ if __name__ == "__main__":
