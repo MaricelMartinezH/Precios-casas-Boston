@@ -115,7 +115,7 @@ def load_processed_features(
 
 def drop_leakage_columns(
     df: pd.DataFrame,
-    columns_to_drop: list[str] = LEAKAGE_COLUMNS,
+    columns_to_drop: list[str],
 ) -> pd.DataFrame:
     """Elimina columnas que constituyen fuga de la variable objetivo.
 

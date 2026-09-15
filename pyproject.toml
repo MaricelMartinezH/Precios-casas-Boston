@@ -3,7 +3,7 @@ name = "template-data-science-container"
 version = "0.1.0"
 description = "Template for data science and AI Projects with the last stable version of python and devcontainer"
 authors = [
-    "Jose R. Zapata <joserzapata.github.io>",
+    { name = "Jose R. Zapata" },
 ]
 requires-python = ">=3.12"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
     "ipykernel>=7.3.0",
     "joblib>=1.6.0",
     "jupyter>=1.1.1",
-    "matplotlib>=3.11.1",
+    "matplotlib>=3.11.2",
     "matplotlib-inline>=0.2.2",
     "numpy>=2.5.3",
     "pandas>=3.0.5",
