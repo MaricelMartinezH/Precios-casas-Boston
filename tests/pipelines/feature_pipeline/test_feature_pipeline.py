@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from pipelines.feature_pipeline import feature_pipeline as fp  # noqa: E402
+from pipelines.feature_pipeline import feature_pipeline as fp
 
 
 @pytest.fixture
