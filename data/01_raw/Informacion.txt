@@ -1,0 +1,48 @@
+TRABAJO FINAL PROGRAMACION ANALITICA
+
+Leer el documento donde se especifica el trabajo a realizar
+
+Este es el resumen del dataset
+
+* TIPO DE PROBLEMA: REGRESIÓN
+
+
+* DESCRIPCION:
+Este dataset consiste en el precio de las casas en varios lugares en Boston. 
+Junto con el precio, el conjunto de datos también proporciona información como
+ Crimen (CRIM), áreas de negocios no minoristas en la ciudad (INDUS),
+ la edad de las personas que poseen la casa (AGE), y hay muchos otros atributos.
+
+La idea es poder determinar el precio de la casa dependiendo de los atributos dados.
+
+* DATOS:
+- crim: per capita crime rate by town.
+
+- zn: proportion of residential land zoned for lots over 25,000 sq.ft.
+
+- indus: proportion of non-retail business acres per town.
+
+- chas: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise).
+
+- nox: nitrogen oxides concentration (parts per 10 million).
+
+- rm: average number of rooms per dwelling.
+
+- age: proportion of owner-occupied units built prior to 1940.
+
+- dis: weighted mean of distances to five Boston employment centres.
+
+- rad: index of accessibility to radial highways.
+
+- tax: full-value property-tax rate per \$10,000.
+
+- ptratio: pupil-teacher ratio by town.
+
+- black: 1000(Bk - 0.63)^2 where Bk is the proportion of blacks by town.
+
+- lstat: lower status of the population (percent).
+
+
+* DATOS DE SALIDA:
+- medv: median value of owner-occupied homes in \$1000.
+
